@@ -38,6 +38,7 @@ public partial class BonPreparationEditViewModel : BaseViewModel
     private readonly IPdfPrintService _pdfPrint;
     private readonly IStockMovementService _stock;
     private readonly ClientSoldeDisplay _clientSolde;
+    private readonly IClientCreditLimitService _creditLimit;
 
     public BonPreparationEditViewModel(
         IDbContextFactory<AppDbContext> dbFactory,
@@ -53,7 +54,8 @@ public partial class BonPreparationEditViewModel : BaseViewModel
         IPdfService pdf,
         IPdfPrintService pdfPrint,
         IStockMovementService stock,
-        IClientAccountStatementService clientLedger)
+        IClientAccountStatementService clientLedger,
+        IClientCreditLimitService creditLimit)
     {
         _dbFactory = dbFactory;
         _numbers = numbers;
@@ -69,6 +71,7 @@ public partial class BonPreparationEditViewModel : BaseViewModel
         _pdfPrint = pdfPrint;
         _stock = stock;
         _clientSolde = new ClientSoldeDisplay(clientLedger, locale);
+        _creditLimit = creditLimit;
         _locale.CultureApplied += (_, _) =>
         {
             RefreshBonPreparationUi();
@@ -603,14 +606,28 @@ public partial class BonPreparationEditViewModel : BaseViewModel
             return;
         }
 
+        var proposedTtc = ComputeFullPaymentTtc();
+        decimal existingTtc = 0m;
         if (BonPreparationId != null)
         {
             await using var checkDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
+            existingTtc = await checkDb.BonsPreparation.AsNoTracking()
+                .Where(b => b.Id == BonPreparationId)
+                .Select(b => b.TotalTtc)
+                .FirstOrDefaultAsync(cancellationToken);
             var paid = await checkDb.PaiementsBonPreparation.AsNoTracking()
                 .Where(p => p.BonPreparationId == BonPreparationId)
                 .SumAsync(p => p.Montant, cancellationToken);
-            if (!await ValidatePaymentsAgainstTtcAsync(ComputeFullPaymentTtc(), paid, cancellationToken))
+            if (!await ValidatePaymentsAgainstTtcAsync(proposedTtc, paid, cancellationToken))
                 return;
+        }
+
+        var creditBlock = await _creditLimit.GetBlockMessageIfFactureWouldExceedAsync(
+            ClientId, proposedTtc, existingTtc, cancellationToken);
+        if (creditBlock is not null)
+        {
+            await _dialog.ShowErrorAsync(_locale.T("Bp_Title"), creditBlock, cancellationToken);
+            return;
         }
 
         IsBusy = true;

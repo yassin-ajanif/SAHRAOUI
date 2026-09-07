@@ -257,7 +257,7 @@ public static class UiTranslations
         ["Wm_MaxCredit"] = ("Plafond de crédit (vide = illimité)", "سقف الدين (فارغ = بلا حد)"),
         ["Lbl_MaxCredit"] = ("Plafond de crédit", "سقف الدين"),
         ["CreditLimit_Exceeded"] = ("Plafond de crédit atteint. Solde actuel : {0} — plafond : {1}.", "تم بلوغ سقف الدين. الرصيد الحالي: {0} — السقف: {1}."),
-        ["CreditLimit_WouldExceed"] = ("Cette facture dépasserait le plafond de crédit. Solde projeté : {0} — plafond : {1}.", "ستتجاوز هذه الفاتورة سقف الدين. الرصيد المتوقع: {0} — السقف: {1}."),
+        ["CreditLimit_WouldExceed"] = ("There is no way to make this operation since the credit is overpassed the value set.\n\nOverrun : {0}\nProjected balance : {1}\nLimit : {2}", "لا يمكن إجراء هذه العملية لأن الدين تجاوز القيمة المحددة.\n\nالتجاوز : {0}\nالرصيد المتوقع : {1}\nالسقف : {2}"),
         ["CreditLimit_BlWarnIntro"] = ("Le montant de ce document dépasse le crédit disponible.", "مبلغ هذا المستند يتجاوز الدين المتاح."),
         ["CreditLimit_LblDocument"] = ("Montant du document", "مبلغ المستند"),
         ["CreditLimit_LblAvailable"] = ("Crédit disponible", "الدين المتاح"),

@@ -99,9 +99,13 @@ public sealed class ClientCreditLimitService : IClientCreditLimitService
             CurrencyHelper.Format(solde),
             CurrencyHelper.Format(maxCredit));
 
-    private string FormatWouldExceedMessage(decimal projected, decimal maxCredit) =>
-        _locale.Tf(
+    private string FormatWouldExceedMessage(decimal projected, decimal maxCredit)
+    {
+        var overrun = projected - maxCredit;
+        return _locale.Tf(
             "CreditLimit_WouldExceed",
+            CurrencyHelper.Format(overrun),
             CurrencyHelper.Format(projected),
             CurrencyHelper.Format(maxCredit));
+    }
 }
