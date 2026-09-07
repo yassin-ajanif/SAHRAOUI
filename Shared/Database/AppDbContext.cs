@@ -63,6 +63,7 @@ public class AppDbContext : DbContext
                 .HasMaxLength(32)
                 .HasDefaultValue(CategorieTiers.Officiel)
                 .IsRequired();
+            e.Ignore(t => t.NomEtSolde);
         });
 
         modelBuilder.Entity<Produit>(e =>

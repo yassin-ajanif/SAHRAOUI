@@ -27,7 +27,11 @@ public partial class ClientCategoryFilter : ObservableObject
     public void ReplaceAll(IEnumerable<Tiers> clients)
     {
         _all.Clear();
-        _all.AddRange(clients);
+        foreach (var c in clients)
+        {
+            c.ResetNomEtSolde();
+            _all.Add(c);
+        }
         Refresh();
     }
 

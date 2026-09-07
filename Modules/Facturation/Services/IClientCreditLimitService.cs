@@ -17,4 +17,13 @@ public interface IClientCreditLimitService
         decimal proposedFactureTtc,
         decimal existingFactureTtc = 0m,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Advisory warning when a BL document TTC would exceed remaining client credit.
+    /// Null when no limit is set or the document fits within the plafond.
+    /// </summary>
+    Task<string?> GetBlDocumentCreditWarningAsync(
+        int clientId,
+        decimal documentTtc,
+        CancellationToken cancellationToken = default);
 }

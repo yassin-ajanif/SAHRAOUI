@@ -11,6 +11,10 @@ public static class PartyAutoComplete
         if (string.IsNullOrWhiteSpace(search)) return false;
 
         var q = search.Trim();
+        var sep = q.IndexOf("  ", StringComparison.Ordinal);
+        if (sep > 0)
+            q = q[..sep].Trim();
+        if (q.Length == 0) return false;
 
         static bool Match(string? s, string qq) =>
             !string.IsNullOrEmpty(s) && s.Contains(qq, StringComparison.OrdinalIgnoreCase);

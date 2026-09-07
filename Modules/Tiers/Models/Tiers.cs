@@ -1,3 +1,4 @@
+﻿using System.ComponentModel.DataAnnotations.Schema;
 using GestionCommerciale.Shared.Models;
 
 namespace GestionCommerciale.Modules.Tiers.Models;
@@ -16,4 +17,13 @@ public class Tiers : BaseEntity
     /// <summary>Optional ceiling on outstanding client balance (solde). Null = no limit.</summary>
     public decimal? MaxCredit { get; set; }
     public bool Actif { get; set; } = true;
+
+    /// <summary>UI-only picker label: name, optionally with solde.</summary>
+    [NotMapped]
+    public string NomEtSolde { get; set; } = string.Empty;
+
+    public void ResetNomEtSolde() => NomEtSolde = Nom;
+
+    public override string ToString() =>
+        string.IsNullOrWhiteSpace(NomEtSolde) ? Nom : NomEtSolde;
 }

@@ -53,6 +53,37 @@ public sealed class ClientCreditLimitService : IClientCreditLimitService
         return FormatWouldExceedMessage(projected, maxCredit.Value);
     }
 
+    public async Task<string?> GetBlDocumentCreditWarningAsync(
+        int clientId,
+        decimal documentTtc,
+        CancellationToken cancellationToken = default)
+    {
+        if (documentTtc <= 0)
+            return null;
+
+        var maxCredit = await GetMaxCreditAsync(clientId, cancellationToken);
+        if (maxCredit is null)
+            return null;
+
+        var statement = await _ledger.GetStatementAsync(clientId, cancellationToken);
+        var remaining = maxCredit.Value - statement.SoldeActuel;
+        if (documentTtc <= remaining)
+            return null;
+
+        return string.Join(
+            Environment.NewLine,
+            _locale.T("CreditLimit_BlWarnIntro"),
+            string.Empty,
+            $"{_locale.T("CreditLimit_LblDocument")} : {CurrencyHelper.Format(documentTtc)}",
+            $"{_locale.T("CreditLimit_LblAvailable")} : {CurrencyHelper.Format(Math.Max(0m, remaining))}",
+            $"{_locale.T("CreditLimit_LblSolde")} : {CurrencyHelper.Format(statement.SoldeActuel)}",
+            $"{_locale.T("CreditLimit_LblPlafond")} : {CurrencyHelper.Format(maxCredit.Value)}",
+            string.Empty,
+            _locale.T("CreditLimit_BlWarnCreditPay"),
+            string.Empty,
+            _locale.T("CreditLimit_BlWarnContinue"));
+    }
+
     private async Task<decimal?> GetMaxCreditAsync(int clientId, CancellationToken cancellationToken)
     {
         await using var db = await _dbFactory.CreateDbContextAsync(cancellationToken);

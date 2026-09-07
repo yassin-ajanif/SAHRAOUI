@@ -1,15 +1,27 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Platform.Storage;
 
 namespace GestionCommerciale.Shared.Services;
 
 public sealed class DialogService : IDialogService
 {
+    private readonly ILocaleService _locale;
+
+    public DialogService(ILocaleService locale) => _locale = locale;
+
     private static Window? GetMainWindow() =>
         Avalonia.Application.Current?.ApplicationLifetime is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime d
             ? d.MainWindow
             : null;
+
+    private void ApplyLocaleLayout(Window window, Panel content)
+    {
+        var flow = _locale.IsRightToLeft ? FlowDirection.RightToLeft : FlowDirection.LeftToRight;
+        window.FlowDirection = flow;
+        content.FlowDirection = flow;
+    }
 
     public async Task ShowInfoAsync(string title, string message, CancellationToken cancellationToken = default, int autoCloseMs = 0)
     {
@@ -17,8 +29,8 @@ public sealed class DialogService : IDialogService
         var w = new Window
         {
             Title = title,
-            MinWidth = 260,
-            MaxWidth = 440,
+            MinWidth = 280,
+            MaxWidth = 480,
             SizeToContent = SizeToContent.WidthAndHeight,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false
@@ -28,13 +40,14 @@ public sealed class DialogService : IDialogService
         panel.Children.Add(new TextBlock
         {
             Text = message,
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-            MaxWidth = 400
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 440
         });
 
         var ok = new Button { Content = "OK", IsDefault = true, HorizontalAlignment = HorizontalAlignment.Right };
         ok.Click += (_, _) => w.Close();
         panel.Children.Add(ok);
+        ApplyLocaleLayout(w, panel);
         w.Content = panel;
 
         if (autoCloseMs > 0)
@@ -55,8 +68,8 @@ public sealed class DialogService : IDialogService
         var w = new Window
         {
             Title = title,
-            MinWidth = 260,
-            MaxWidth = 440,
+            MinWidth = 280,
+            MaxWidth = 480,
             SizeToContent = SizeToContent.WidthAndHeight,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             CanResize = false
@@ -67,8 +80,8 @@ public sealed class DialogService : IDialogService
         panel.Children.Add(new TextBlock
         {
             Text = message,
-            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
-            MaxWidth = 400
+            TextWrapping = TextWrapping.Wrap,
+            MaxWidth = 440
         });
 
         var buttons = new StackPanel
@@ -78,13 +91,13 @@ public sealed class DialogService : IDialogService
             Spacing = 8
         };
 
-        var no = new Button { Content = "Non" };
+        var no = new Button { Content = _locale.T("Btn_No") };
         no.Click += (_, _) =>
         {
             confirmed = false;
             w.Close();
         };
-        var yes = new Button { Content = "Oui", IsDefault = true };
+        var yes = new Button { Content = _locale.T("Btn_Yes"), IsDefault = true };
         yes.Click += (_, _) =>
         {
             confirmed = true;
@@ -93,6 +106,7 @@ public sealed class DialogService : IDialogService
         buttons.Children.Add(no);
         buttons.Children.Add(yes);
         panel.Children.Add(buttons);
+        ApplyLocaleLayout(w, panel);
         w.Content = panel;
 
         if (owner != null)
@@ -153,6 +167,7 @@ public sealed class DialogService : IDialogService
         buttons.Children.Add(cancel);
         buttons.Children.Add(ok);
         panel.Children.Add(buttons);
+        ApplyLocaleLayout(w, panel);
         w.Content = panel;
 
         if (owner != null)
