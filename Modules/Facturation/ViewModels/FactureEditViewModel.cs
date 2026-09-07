@@ -38,6 +38,7 @@ public partial class FactureEditViewModel : BaseViewModel
     private readonly IPdfPrintService _pdfPrint;
     private readonly IFactureBlLinkService _blLinkService;
     private readonly IFactureBccLinkService _bccLinkService;
+    private readonly IClientCreditLimitService _creditLimit;
 
     public FactureEditViewModel(
         IDbContextFactory<AppDbContext> dbFactory,
@@ -46,6 +47,7 @@ public partial class FactureEditViewModel : BaseViewModel
         IFactureWorkflowService factureWorkflow,
         IFactureBlLinkService blLinkService,
         IFactureBccLinkService bccLinkService,
+        IClientCreditLimitService creditLimit,
         IDialogService dialog,
         WorkspaceNavigator workspaceNavigator,
         IServiceProvider sp,
@@ -69,6 +71,7 @@ public partial class FactureEditViewModel : BaseViewModel
         _pdfPrint = pdfPrint;
         _blLinkService = blLinkService;
         _bccLinkService = bccLinkService;
+        _creditLimit = creditLimit;
         _locale.CultureApplied += (_, _) =>
         {
             RefreshFactureUi();
@@ -817,14 +820,28 @@ public partial class FactureEditViewModel : BaseViewModel
             return;
         }
 
+        var proposedTtc = ComputeFullPaymentTtc();
+        decimal existingTtc = 0m;
         if (FactureId != null)
         {
             await using var checkDb = await _dbFactory.CreateDbContextAsync(cancellationToken);
+            existingTtc = await checkDb.Factures.AsNoTracking()
+                .Where(f => f.Id == FactureId)
+                .Select(f => f.TotalTtc)
+                .FirstOrDefaultAsync(cancellationToken);
             var paid = await checkDb.Paiements.AsNoTracking()
                 .Where(p => p.FactureId == FactureId)
                 .SumAsync(p => p.Montant, cancellationToken);
-            if (!await ValidatePaymentsAgainstTtcAsync(ComputeFullPaymentTtc(), paid, cancellationToken))
+            if (!await ValidatePaymentsAgainstTtcAsync(proposedTtc, paid, cancellationToken))
                 return;
+        }
+
+        var creditBlock = await _creditLimit.GetBlockMessageIfFactureWouldExceedAsync(
+            ClientId, proposedTtc, existingTtc, cancellationToken);
+        if (creditBlock is not null)
+        {
+            await _dialog.ShowErrorAsync(_locale.T("Fact_Title"), creditBlock, cancellationToken);
+            return;
         }
 
         IsBusy = true;

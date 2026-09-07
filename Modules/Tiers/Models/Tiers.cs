@@ -13,5 +13,7 @@ public class Tiers : BaseEntity
     public string Telephone { get; set; } = string.Empty;
     public string Email { get; set; } = string.Empty;
     public string ConditionsPaiement { get; set; } = string.Empty;
+    /// <summary>Optional ceiling on outstanding client balance (solde). Null = no limit.</summary>
+    public decimal? MaxCredit { get; set; }
     public bool Actif { get; set; } = true;
 }

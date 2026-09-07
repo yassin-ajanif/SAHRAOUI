@@ -80,9 +80,12 @@ public partial class TiersDetailViewModel : BaseViewModel
     [ObservableProperty] private string _wmTelephone = string.Empty;
     [ObservableProperty] private string _wmEmail = string.Empty;
     [ObservableProperty] private string _wmConditions = string.Empty;
+    [ObservableProperty] private string _wmMaxCredit = string.Empty;
+    [ObservableProperty] private string _lblMaxCredit = string.Empty;
     [ObservableProperty] private string _chkActif = string.Empty;
     [ObservableProperty] private string _btnSave = string.Empty;
     [ObservableProperty] private string _lblCategorie = string.Empty;
+    [ObservableProperty] private bool _showMaxCredit;
 
     [ObservableProperty] private string _lblLedgerTitle = string.Empty;
     [ObservableProperty] private string _lblSoldeActuel = string.Empty;
@@ -114,6 +117,7 @@ public partial class TiersDetailViewModel : BaseViewModel
     [ObservableProperty] private string _telephone = string.Empty;
     [ObservableProperty] private string _email = string.Empty;
     [ObservableProperty] private string _conditionsPaiement = string.Empty;
+    [ObservableProperty] private string _maxCreditText = string.Empty;
     [ObservableProperty] private bool _actif = true;
 
     private void RefreshDetailUi()
@@ -126,9 +130,12 @@ public partial class TiersDetailViewModel : BaseViewModel
         WmTelephone = _locale.T("Wm_Telephone");
         WmEmail = _locale.T("Wm_Email");
         WmConditions = _locale.T("Wm_ConditionsPaiement");
+        WmMaxCredit = _locale.T("Wm_MaxCredit");
+        LblMaxCredit = _locale.T("Lbl_MaxCredit");
         ChkActif = _locale.T("Lbl_Actif");
         BtnSave = _locale.T("Btn_Save");
         LblCategorie = _locale.T("Lbl_CategorieTiers");
+        UpdateShowMaxCredit();
         LblLedgerTitle = _returnScope == TiersListScope.Fournisseurs
             ? _locale.T("SupplierLedger_Title")
             : _locale.T("ClientLedger_Title");
@@ -187,9 +194,11 @@ public partial class TiersDetailViewModel : BaseViewModel
             Telephone = string.Empty;
             Email = string.Empty;
             ConditionsPaiement = string.Empty;
+            MaxCreditText = string.Empty;
             Type = returnScope == TiersListScope.Fournisseurs ? TypeTiers.Fournisseur : TypeTiers.Client;
             Categorie = CategorieTiers.Officiel;
             Actif = true;
+            UpdateShowMaxCredit();
             Title = returnScope == TiersListScope.Fournisseurs
                 ? _locale.T("TiersDetail_NewSupplier")
                 : _locale.T("TiersDetail_NewClient");
@@ -223,6 +232,7 @@ public partial class TiersDetailViewModel : BaseViewModel
             Telephone = t.Telephone;
             Email = t.Email;
             ConditionsPaiement = t.ConditionsPaiement;
+            MaxCreditText = t.MaxCredit is { } max ? max.ToString("0.##") : string.Empty;
             Actif = t.Actif;
             Title = _returnScope == TiersListScope.Fournisseurs
                 ? _locale.Tf("Tiers_TitleSupplierFmt", t.Nom)
@@ -231,6 +241,7 @@ public partial class TiersDetailViewModel : BaseViewModel
             ShowLedgerSaveFirst = false;
             var isClient = t.Type is TypeTiers.Client or TypeTiers.LesDeux;
             var isSupplier = t.Type is TypeTiers.Fournisseur or TypeTiers.LesDeux;
+            UpdateShowMaxCredit();
             ShowLedger = _returnScope switch
             {
                 TiersListScope.Clients => isClient,
@@ -314,12 +325,44 @@ public partial class TiersDetailViewModel : BaseViewModel
         }
     }
 
+    partial void OnTypeChanged(TypeTiers value) => UpdateShowMaxCredit();
+
+    private void UpdateShowMaxCredit() =>
+        ShowMaxCredit = _returnScope == TiersListScope.Clients
+            && Type is TypeTiers.Client or TypeTiers.LesDeux;
+
+    private bool TryParseMaxCredit(out decimal? maxCredit, out string? errorKey)
+    {
+        maxCredit = null;
+        errorKey = null;
+        if (!ShowMaxCredit || string.IsNullOrWhiteSpace(MaxCreditText))
+            return true;
+
+        if (!decimal.TryParse(MaxCreditText.Trim().Replace(',', '.'),
+                System.Globalization.NumberStyles.Number,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out var parsed) || parsed < 0)
+        {
+            errorKey = "Tiers_ErrMaxCredit";
+            return false;
+        }
+
+        maxCredit = parsed;
+        return true;
+    }
+
     [RelayCommand]
     private async Task SaveAsync(CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(Nom))
         {
             await _dialog.ShowErrorAsync(_locale.T("Dlg_Validation"), _locale.T("Tiers_ErrName"), cancellationToken);
+            return;
+        }
+
+        if (!TryParseMaxCredit(out var maxCredit, out var maxCreditError))
+        {
+            await _dialog.ShowErrorAsync(_locale.T("Dlg_Validation"), _locale.T(maxCreditError!), cancellationToken);
             return;
         }
 
@@ -340,6 +383,7 @@ public partial class TiersDetailViewModel : BaseViewModel
                     Telephone = Telephone.Trim(),
                     Email = Email.Trim(),
                     ConditionsPaiement = ConditionsPaiement.Trim(),
+                    MaxCredit = maxCredit,
                     Actif = Actif
                 };
                 db.Tiers.Add(t);
@@ -358,6 +402,7 @@ public partial class TiersDetailViewModel : BaseViewModel
                 t.Telephone = Telephone.Trim();
                 t.Email = Email.Trim();
                 t.ConditionsPaiement = ConditionsPaiement.Trim();
+                t.MaxCredit = ShowMaxCredit ? maxCredit : null;
                 t.Actif = Actif;
                 await db.SaveChangesAsync(cancellationToken);
             }

@@ -43,6 +43,7 @@ public partial class BLEditViewModel : BaseViewModel
     private readonly IAppSettingsService _settings;
     private readonly IFactureBlLinkService _blLinkService;
     private readonly IFactureBccLinkService _bccLinkService;
+    private readonly IClientCreditLimitService _creditLimit;
 
     public BLEditViewModel(
         IDbContextFactory<AppDbContext> dbFactory,
@@ -59,7 +60,8 @@ public partial class BLEditViewModel : BaseViewModel
         IPdfPrintService pdfPrint,
         IAppSettingsService settings,
         IFactureBlLinkService blLinkService,
-        IFactureBccLinkService bccLinkService)
+        IFactureBccLinkService bccLinkService,
+        IClientCreditLimitService creditLimit)
     {
         _dbFactory = dbFactory;
         _numbers = numbers;
@@ -76,6 +78,7 @@ public partial class BLEditViewModel : BaseViewModel
         _settings = settings;
         _blLinkService = blLinkService;
         _bccLinkService = bccLinkService;
+        _creditLimit = creditLimit;
         _locale.CultureApplied += (_, _) => RefreshBlUi();
         LineGridColumns.PropertyChanged += OnLineGridColumnsPropertyChanged;
         _uiPreferences.LoadDocumentLineColumns("bon_livraison", LineGridColumns);
@@ -581,6 +584,13 @@ public partial class BLEditViewModel : BaseViewModel
         if (DocumentTotalsHelper.IsEffectivelyZeroTotal(TotalTtc))
         {
             await _dialog.ShowErrorAsync(_locale.T("BL_DlgShort"), _locale.T("Doc_ErrZeroTtc"), cancellationToken);
+            return;
+        }
+
+        var creditBlock = await _creditLimit.GetBlockMessageIfLimitExceededAsync(ClientId, cancellationToken);
+        if (creditBlock is not null)
+        {
+            await _dialog.ShowErrorAsync(_locale.T("BL_DlgShort"), creditBlock, cancellationToken);
             return;
         }
 

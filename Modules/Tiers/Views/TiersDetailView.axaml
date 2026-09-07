@@ -48,6 +48,11 @@
           <TextBox Watermark="{Binding WmConditions}" Text="{Binding ConditionsPaiement}"/>
         </StackPanel>
 
+        <StackPanel Spacing="3" IsVisible="{Binding ShowMaxCredit}">
+          <TextBlock Text="{Binding LblMaxCredit}"/>
+          <TextBox Watermark="{Binding WmMaxCredit}" Text="{Binding MaxCreditText}"/>
+        </StackPanel>
+
         <CheckBox Content="{Binding ChkActif}" IsChecked="{Binding Actif}"/>
         <Button Content="{Binding BtnSave}" Command="{Binding SaveCommand}"/>
       </StackPanel>
