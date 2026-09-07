@@ -44,8 +44,7 @@ public partial class BLEditViewModel : BaseViewModel
     private readonly IFactureBlLinkService _blLinkService;
     private readonly IFactureBccLinkService _bccLinkService;
     private readonly IClientCreditLimitService _creditLimit;
-    private readonly IClientAccountStatementService _clientLedger;
-    private int _clientSoldeLoadVersion;
+    private readonly ClientSoldeDisplay _clientSolde;
 
     public BLEditViewModel(
         IDbContextFactory<AppDbContext> dbFactory,
@@ -82,12 +81,12 @@ public partial class BLEditViewModel : BaseViewModel
         _blLinkService = blLinkService;
         _bccLinkService = bccLinkService;
         _creditLimit = creditLimit;
-        _clientLedger = clientLedger;
+        _clientSolde = new ClientSoldeDisplay(clientLedger, locale);
         _locale.CultureApplied += (_, _) =>
         {
             RefreshBlUi();
             if (ClientId > 0)
-                _ = RefreshClientSoldeAsync(ClientId);
+                _ = ClientSolde.RefreshAsync(ClientId, Devise);
         };
         LineGridColumns.PropertyChanged += OnLineGridColumnsPropertyChanged;
         _uiPreferences.LoadDocumentLineColumns("bon_livraison", LineGridColumns);
@@ -236,10 +235,7 @@ public partial class BLEditViewModel : BaseViewModel
     [ObservableProperty] private int? _devisId;
     [ObservableProperty] private int _clientId;
     [ObservableProperty] private GestionCommerciale.Modules.Tiers.Models.Tiers? _selectedClient;
-    [ObservableProperty] private string _clientSoldeText = string.Empty;
-    public bool HasClientSolde => !string.IsNullOrWhiteSpace(ClientSoldeText);
-
-    partial void OnClientSoldeTextChanged(string value) => OnPropertyChanged(nameof(HasClientSolde));
+    public ClientSoldeDisplay ClientSolde => _clientSolde;
 
     [ObservableProperty] private string _numero = string.Empty;
     [ObservableProperty] private DateTimeOffset _date = new(DateTime.Today);
@@ -294,7 +290,7 @@ public partial class BLEditViewModel : BaseViewModel
         var id = value?.Id ?? 0;
         if (ClientId == id)
         {
-            _ = RefreshClientSoldeAsync(id);
+            _ = ClientSolde.RefreshAsync(id, Devise);
             return;
         }
 
@@ -309,32 +305,7 @@ public partial class BLEditViewModel : BaseViewModel
             SelectedClient = Clients.FirstOrDefault(c => c.Id == value);
         }
 
-        _ = RefreshClientSoldeAsync(value);
-    }
-
-    private async Task RefreshClientSoldeAsync(int clientId)
-    {
-        var version = ++_clientSoldeLoadVersion;
-        if (clientId <= 0)
-        {
-            ClientSoldeText = string.Empty;
-            return;
-        }
-
-        try
-        {
-            var statement = await _clientLedger.GetStatementAsync(clientId);
-            if (version != _clientSoldeLoadVersion)
-                return;
-
-            var amount = CurrencyHelper.Format(statement.SoldeActuel, Devise);
-            ClientSoldeText = _locale.Tf("BL_ClientSoldeFmt", amount);
-        }
-        catch
-        {
-            if (version == _clientSoldeLoadVersion)
-                ClientSoldeText = string.Empty;
-        }
+        _ = ClientSolde.RefreshAsync(value, Devise);
     }
 
     partial void OnAddLineCatalogPickChanged(object? value)
@@ -608,7 +579,7 @@ public partial class BLEditViewModel : BaseViewModel
     {
         RefreshTotals();
         if (ClientId > 0)
-            _ = RefreshClientSoldeAsync(ClientId);
+            _ = ClientSolde.RefreshAsync(ClientId, value);
     }
 
     [RelayCommand]

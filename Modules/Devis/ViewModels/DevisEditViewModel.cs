@@ -34,6 +34,7 @@ public partial class DevisEditViewModel : BaseViewModel
     private readonly IUiPreferencesService _uiPreferences;
     private readonly IPdfService _pdf;
     private readonly IPdfPrintService _pdfPrint;
+    private readonly ClientSoldeDisplay _clientSolde;
 
     public DevisEditViewModel(
         IDbContextFactory<AppDbContext> dbFactory,
@@ -46,7 +47,8 @@ public partial class DevisEditViewModel : BaseViewModel
         ILocaleService locale,
         IUiPreferencesService uiPreferences,
         IPdfService pdf,
-        IPdfPrintService pdfPrint)
+        IPdfPrintService pdfPrint,
+        GestionCommerciale.Modules.Facturation.Services.IClientAccountStatementService clientLedger)
     {
         _dbFactory = dbFactory;
         _numbers = numbers;
@@ -59,10 +61,13 @@ public partial class DevisEditViewModel : BaseViewModel
         _uiPreferences = uiPreferences;
         _pdf = pdf;
         _pdfPrint = pdfPrint;
+        _clientSolde = new ClientSoldeDisplay(clientLedger, locale);
         _locale.CultureApplied += (_, _) =>
         {
             RefreshDevisUi();
             RefreshTotals();
+            if (ClientId > 0)
+                _ = ClientSolde.RefreshAsync(ClientId, Devise);
         };
         LineGridColumns.PropertyChanged += OnLineGridColumnsPropertyChanged;
         _uiPreferences.LoadDocumentLineColumns("devis", LineGridColumns);
@@ -139,6 +144,7 @@ public partial class DevisEditViewModel : BaseViewModel
     }
 
     public ClientCategoryFilter ClientLookup { get; } = new();
+    public ClientSoldeDisplay ClientSolde => _clientSolde;
     public ObservableCollection<GestionCommerciale.Modules.Tiers.Models.Tiers> Clients => ClientLookup.Clients;
     public ObservableCollection<GestionCommerciale.Modules.Stock.Models.Produit> Produits { get; } = [];
     public ObservableCollection<DevisLineRow> Lignes { get; } = [];
@@ -258,22 +264,36 @@ public partial class DevisEditViewModel : BaseViewModel
     private string FormatTotalLabel(string key, decimal amount) =>
         _locale.Tf(key, amount, Devise).TrimEnd();
 
-    partial void OnDeviseChanged(string value) => RefreshTotals();
+    partial void OnDeviseChanged(string value)
+    {
+        RefreshTotals();
+        if (ClientId > 0)
+            _ = ClientSolde.RefreshAsync(ClientId, value);
+    }
 
     partial void OnRemiseGlobaleChanged(decimal value) => RefreshTotals();
 
     partial void OnSelectedClientChanged(GestionCommerciale.Modules.Tiers.Models.Tiers? value)
     {
         var id = value?.Id ?? 0;
-        if (ClientId == id) return;
+        if (ClientId == id)
+        {
+            _ = ClientSolde.RefreshAsync(id, Devise);
+            return;
+        }
+
         ClientId = id;
     }
 
     partial void OnClientIdChanged(int value)
     {
-        if (SelectedClient?.Id == value) return;
-        ClientLookup.EnsureCategoryFor(value);
-        SelectedClient = Clients.FirstOrDefault(c => c.Id == value);
+        if (SelectedClient?.Id != value)
+        {
+            ClientLookup.EnsureCategoryFor(value);
+            SelectedClient = Clients.FirstOrDefault(c => c.Id == value);
+        }
+
+        _ = ClientSolde.RefreshAsync(value, Devise);
     }
 
     partial void OnDevisIdChanged(int? value) => RemoveDevisCommand.NotifyCanExecuteChanged();

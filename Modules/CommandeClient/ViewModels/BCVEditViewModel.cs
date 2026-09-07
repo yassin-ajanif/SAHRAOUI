@@ -31,6 +31,7 @@ public partial class BCVEditViewModel : BaseViewModel
     private readonly IPdfService _pdf;
     private readonly IPdfPrintService _pdfPrint;
     private readonly IAppSettingsService _settings;
+    private readonly ClientSoldeDisplay _clientSolde;
 
     public BCVEditViewModel(
         IDbContextFactory<AppDbContext> dbFactory,
@@ -43,7 +44,8 @@ public partial class BCVEditViewModel : BaseViewModel
         IUiPreferencesService uiPreferences,
         IPdfService pdf,
         IPdfPrintService pdfPrint,
-        IAppSettingsService settings)
+        IAppSettingsService settings,
+        GestionCommerciale.Modules.Facturation.Services.IClientAccountStatementService clientLedger)
     {
         _dbFactory = dbFactory;
         _numbers = numbers;
@@ -56,7 +58,13 @@ public partial class BCVEditViewModel : BaseViewModel
         _pdf = pdf;
         _pdfPrint = pdfPrint;
         _settings = settings;
-        _locale.CultureApplied += (_, _) => RefreshBccUi();
+        _clientSolde = new ClientSoldeDisplay(clientLedger, locale);
+        _locale.CultureApplied += (_, _) =>
+        {
+            RefreshBccUi();
+            if (ClientId > 0)
+                _ = ClientSolde.RefreshAsync(ClientId, Devise);
+        };
         LineGridColumns.PropertyChanged += OnLineGridColumnsPropertyChanged;
         _uiPreferences.LoadDocumentLineColumns("bon_commande_client", LineGridColumns);
         Lignes.CollectionChanged += LignesOnCollectionChanged;
@@ -159,6 +167,7 @@ public partial class BCVEditViewModel : BaseViewModel
     }
 
     public ClientCategoryFilter ClientLookup { get; } = new();
+    public ClientSoldeDisplay ClientSolde => _clientSolde;
     public ObservableCollection<GestionCommerciale.Modules.Tiers.Models.Tiers> Clients => ClientLookup.Clients;
     public ObservableCollection<GestionCommerciale.Modules.Stock.Models.Produit> Produits { get; } = [];
     public ObservableCollection<BCVLineRow> Lignes { get; } = [];
@@ -278,20 +287,34 @@ public partial class BCVEditViewModel : BaseViewModel
         TotalTtcLabel = _locale.Tf("Doc_FmtTtc", ttc, Devise).TrimEnd();
     }
 
-    partial void OnDeviseChanged(string value) => RefreshTotals();
+    partial void OnDeviseChanged(string value)
+    {
+        RefreshTotals();
+        if (ClientId > 0)
+            _ = ClientSolde.RefreshAsync(ClientId, value);
+    }
 
     partial void OnSelectedClientChanged(GestionCommerciale.Modules.Tiers.Models.Tiers? value)
     {
         var id = value?.Id ?? 0;
-        if (ClientId == id) return;
+        if (ClientId == id)
+        {
+            _ = ClientSolde.RefreshAsync(id, Devise);
+            return;
+        }
+
         ClientId = id;
     }
 
     partial void OnClientIdChanged(int value)
     {
-        if (SelectedClient?.Id == value) return;
-        ClientLookup.EnsureCategoryFor(value);
-        SelectedClient = Clients.FirstOrDefault(c => c.Id == value);
+        if (SelectedClient?.Id != value)
+        {
+            ClientLookup.EnsureCategoryFor(value);
+            SelectedClient = Clients.FirstOrDefault(c => c.Id == value);
+        }
+
+        _ = ClientSolde.RefreshAsync(value, Devise);
     }
 
     public async Task LoadAsync(int? id, CancellationToken cancellationToken = default)

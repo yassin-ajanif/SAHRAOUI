@@ -73,11 +73,11 @@
           </AutoCompleteBox.ItemTemplate>
         </AutoCompleteBox>
         <TextBlock Grid.Column="6"
-                   Text="{Binding ClientSoldeText}"
+                   Text="{Binding ClientSolde.Text}"
                    FontWeight="Bold"
                    Foreground="#EA580C"
                    VerticalAlignment="Center"
-                   IsVisible="{Binding HasClientSolde}"/>
+                   IsVisible="{Binding ClientSolde.IsVisible}"/>
         <StackPanel Grid.Column="8" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
           <TextBlock Text="{Binding LblDateBl}" VerticalAlignment="Center" Opacity="0.7"/>
           <DatePicker SelectedDate="{Binding Date}"/>

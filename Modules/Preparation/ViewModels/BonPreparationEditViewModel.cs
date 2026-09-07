@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GestionCommerciale.Modules.Auth.Services;
 using GestionCommerciale.Modules.Facturation.Models;
+using GestionCommerciale.Modules.Facturation.Services;
 using GestionCommerciale.Modules.Stock;
 using GestionCommerciale.Modules.Stock.Services;
 using GestionCommerciale.Modules.Preparation.Models;
@@ -36,6 +37,7 @@ public partial class BonPreparationEditViewModel : BaseViewModel
     private readonly IPdfService _pdf;
     private readonly IPdfPrintService _pdfPrint;
     private readonly IStockMovementService _stock;
+    private readonly ClientSoldeDisplay _clientSolde;
 
     public BonPreparationEditViewModel(
         IDbContextFactory<AppDbContext> dbFactory,
@@ -50,7 +52,8 @@ public partial class BonPreparationEditViewModel : BaseViewModel
         IUiPreferencesService uiPreferences,
         IPdfService pdf,
         IPdfPrintService pdfPrint,
-        IStockMovementService stock)
+        IStockMovementService stock,
+        IClientAccountStatementService clientLedger)
     {
         _dbFactory = dbFactory;
         _numbers = numbers;
@@ -65,10 +68,13 @@ public partial class BonPreparationEditViewModel : BaseViewModel
         _pdf = pdf;
         _pdfPrint = pdfPrint;
         _stock = stock;
+        _clientSolde = new ClientSoldeDisplay(clientLedger, locale);
         _locale.CultureApplied += (_, _) =>
         {
             RefreshBonPreparationUi();
             UpdateBonPreparationTotalLines();
+            if (ClientId > 0)
+                _ = ClientSolde.RefreshAsync(ClientId, Devise);
         };
         LineGridColumns.PropertyChanged += OnLineGridColumnsPropertyChanged;
         _uiPreferences.LoadDocumentLineColumns("bon_preparation", LineGridColumns);
@@ -78,6 +84,7 @@ public partial class BonPreparationEditViewModel : BaseViewModel
     }
 
     public ClientCategoryFilter ClientLookup { get; } = new();
+    public ClientSoldeDisplay ClientSolde => _clientSolde;
     public ObservableCollection<GestionCommerciale.Modules.Tiers.Models.Tiers> Clients => ClientLookup.Clients;
     public ObservableCollection<GestionCommerciale.Modules.Stock.Models.Produit> Produits { get; } = [];
     public ObservableCollection<BonPreparationLineRow> Lignes { get; } = [];
@@ -220,7 +227,12 @@ public partial class BonPreparationEditViewModel : BaseViewModel
         MontantPayeLine = _locale.Tf("Doc_FmtPaye", MontantPaye);
     }
 
-    partial void OnDeviseChanged(string value) => UpdateBonPreparationTotalLines();
+    partial void OnDeviseChanged(string value)
+    {
+        UpdateBonPreparationTotalLines();
+        if (ClientId > 0)
+            _ = ClientSolde.RefreshAsync(ClientId, value);
+    }
 
     public Array ModesPaiement => Enum.GetValues(typeof(ModePaiement));
 
@@ -444,15 +456,24 @@ public partial class BonPreparationEditViewModel : BaseViewModel
     partial void OnSelectedClientChanged(GestionCommerciale.Modules.Tiers.Models.Tiers? value)
     {
         var id = value?.Id ?? 0;
-        if (ClientId == id) return;
+        if (ClientId == id)
+        {
+            _ = ClientSolde.RefreshAsync(id, Devise);
+            return;
+        }
+
         ClientId = id;
     }
 
     partial void OnClientIdChanged(int value)
     {
-        if (SelectedClient?.Id == value) return;
-        ClientLookup.EnsureCategoryFor(value);
-        SelectedClient = Clients.FirstOrDefault(c => c.Id == value);
+        if (SelectedClient?.Id != value)
+        {
+            ClientLookup.EnsureCategoryFor(value);
+            SelectedClient = Clients.FirstOrDefault(c => c.Id == value);
+        }
+
+        _ = ClientSolde.RefreshAsync(value, Devise);
     }
 
     public async Task LoadAsync(int? id, CancellationToken cancellationToken = default)

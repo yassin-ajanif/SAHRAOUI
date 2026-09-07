@@ -46,7 +46,9 @@
               </ComboBox.ItemTemplate>
             </ComboBox>
             <AutoCompleteBox MinWidth="200"
-                             MaxWidth="420"
+                             MaxWidth="200"
+                             Width="200"
+                             HorizontalAlignment="Left"
                              VerticalAlignment="Center"
                              MinimumPrefixLength="1"
                              MaxDropDownHeight="320"
@@ -64,6 +66,11 @@
                 </DataTemplate>
               </AutoCompleteBox.ItemTemplate>
             </AutoCompleteBox>
+            <TextBlock Text="{Binding ClientSolde.Text}"
+                       FontWeight="Bold"
+                       Foreground="#EA580C"
+                       VerticalAlignment="Center"
+                       IsVisible="{Binding ClientSolde.IsVisible}"/>
           </StackPanel>
           <StackPanel Grid.Column="2"
                       Orientation="Horizontal"

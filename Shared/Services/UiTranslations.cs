@@ -115,6 +115,7 @@ public static class UiTranslations
         ["BL_ErrDraftOnly"] = ("Seul le brouillon est modifiable.", "مسودة فقط قابلة للتعديل."),
         ["BL_Saved"] = ("Enregistré.", "تم الحفظ."),
         ["BL_ClientSoldeFmt"] = ("Solde : {0}", "الرصيد : {0}"),
+        ["Client_SoldeFmt"] = ("Solde : {0}", "الرصيد : {0}"),
         ["BL_MenuDelete"] = ("Supprimer le bon de livraison…", "حذف أمر التسليم…"),
         ["BL_ConfirmDelete"] = ("Supprimer définitivement le bon de livraison {0} ?", "حذف أمر التسليم {0} نهائياً؟"),
         ["BL_Deleted"] = ("Bon de livraison supprimé.", "تم حذف أمر التسليم."),

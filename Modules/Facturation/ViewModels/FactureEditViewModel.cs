@@ -39,6 +39,7 @@ public partial class FactureEditViewModel : BaseViewModel
     private readonly IFactureBlLinkService _blLinkService;
     private readonly IFactureBccLinkService _bccLinkService;
     private readonly IClientCreditLimitService _creditLimit;
+    private readonly ClientSoldeDisplay _clientSolde;
 
     public FactureEditViewModel(
         IDbContextFactory<AppDbContext> dbFactory,
@@ -48,6 +49,7 @@ public partial class FactureEditViewModel : BaseViewModel
         IFactureBlLinkService blLinkService,
         IFactureBccLinkService bccLinkService,
         IClientCreditLimitService creditLimit,
+        IClientAccountStatementService clientLedger,
         IDialogService dialog,
         WorkspaceNavigator workspaceNavigator,
         IServiceProvider sp,
@@ -72,10 +74,13 @@ public partial class FactureEditViewModel : BaseViewModel
         _blLinkService = blLinkService;
         _bccLinkService = bccLinkService;
         _creditLimit = creditLimit;
+        _clientSolde = new ClientSoldeDisplay(clientLedger, locale);
         _locale.CultureApplied += (_, _) =>
         {
             RefreshFactureUi();
             UpdateFactureTotalLines();
+            if (ClientId > 0)
+                _ = ClientSolde.RefreshAsync(ClientId, Devise);
         };
         LineGridColumns.PropertyChanged += OnLineGridColumnsPropertyChanged;
         _uiPreferences.LoadDocumentLineColumns("facture", LineGridColumns);
@@ -85,6 +90,7 @@ public partial class FactureEditViewModel : BaseViewModel
     }
 
     public ClientCategoryFilter ClientLookup { get; } = new();
+    public ClientSoldeDisplay ClientSolde => _clientSolde;
     public ObservableCollection<GestionCommerciale.Modules.Tiers.Models.Tiers> Clients => ClientLookup.Clients;
     public ObservableCollection<GestionCommerciale.Modules.Stock.Models.Produit> Produits { get; } = [];
     public ObservableCollection<FactureLineRow> Lignes { get; } = [];
@@ -240,7 +246,12 @@ public partial class FactureEditViewModel : BaseViewModel
         MontantPayeLine = _locale.Tf("Doc_FmtPaye", MontantPaye);
     }
 
-    partial void OnDeviseChanged(string value) => UpdateFactureTotalLines();
+    partial void OnDeviseChanged(string value)
+    {
+        UpdateFactureTotalLines();
+        if (ClientId > 0)
+            _ = ClientSolde.RefreshAsync(ClientId, value);
+    }
 
     public Array ModesPaiement => Enum.GetValues(typeof(ModePaiement));
 
@@ -468,15 +479,24 @@ public partial class FactureEditViewModel : BaseViewModel
     partial void OnSelectedClientChanged(GestionCommerciale.Modules.Tiers.Models.Tiers? value)
     {
         var id = value?.Id ?? 0;
-        if (ClientId == id) return;
+        if (ClientId == id)
+        {
+            _ = ClientSolde.RefreshAsync(id, Devise);
+            return;
+        }
+
         ClientId = id;
     }
 
     partial void OnClientIdChanged(int value)
     {
-        if (SelectedClient?.Id == value) return;
-        ClientLookup.EnsureCategoryFor(value);
-        SelectedClient = Clients.FirstOrDefault(c => c.Id == value);
+        if (SelectedClient?.Id != value)
+        {
+            ClientLookup.EnsureCategoryFor(value);
+            SelectedClient = Clients.FirstOrDefault(c => c.Id == value);
+        }
+
+        _ = ClientSolde.RefreshAsync(value, Devise);
     }
 
     public async Task LoadAsync(int? id, CancellationToken cancellationToken = default)
