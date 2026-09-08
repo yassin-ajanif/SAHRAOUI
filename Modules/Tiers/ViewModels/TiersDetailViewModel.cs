@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GestionCommerciale.Modules.Facturation.Models;
 using GestionCommerciale.Modules.Facturation.Services;
 using GestionCommerciale.Modules.Reception.Services;
 using GestionCommerciale.Modules.Tiers.Models;
@@ -32,6 +34,7 @@ public partial class TiersDetailViewModel : BaseViewModel
     private readonly IServiceProvider _sp;
     private readonly ILocaleService _locale;
     private readonly IClientAccountStatementService _clientLedgerService;
+    private readonly IClientBulkPaymentService _bulkPayment;
     private readonly ISupplierAccountStatementService _supplierLedgerService;
     private readonly IPdfService _pdf;
     private readonly IAppSettingsService _settings;
@@ -48,6 +51,7 @@ public partial class TiersDetailViewModel : BaseViewModel
         IServiceProvider sp,
         ILocaleService locale,
         IClientAccountStatementService clientLedgerService,
+        IClientBulkPaymentService bulkPayment,
         ISupplierAccountStatementService supplierLedgerService,
         IPdfService pdf,
         IAppSettingsService settings)
@@ -58,11 +62,18 @@ public partial class TiersDetailViewModel : BaseViewModel
         _sp = sp;
         _locale = locale;
         _clientLedgerService = clientLedgerService;
+        _bulkPayment = bulkPayment;
         _supplierLedgerService = supplierLedgerService;
         _pdf = pdf;
         _settings = settings;
         Title = _locale.T("TiersDetail_Title");
         RebuildTypeOptions();
+        BulkPayModes.Clear();
+        foreach (ModePaiement mode in Enum.GetValues(typeof(ModePaiement)))
+        {
+            if (mode == ModePaiement.Credit) continue;
+            BulkPayModes.Add(mode);
+        }
         _locale.CultureApplied += (_, _) =>
         {
             RefreshDetailUi();
@@ -102,10 +113,23 @@ public partial class TiersDetailViewModel : BaseViewModel
     [ObservableProperty] private bool _showLedger;
     [ObservableProperty] private bool _showLedgerSaveFirst;
     [ObservableProperty] private bool _showLedgerEmpty;
+    [ObservableProperty] private bool _showBulkPay;
+
+    [ObservableProperty] private string _lblBulkPayTitle = string.Empty;
+    [ObservableProperty] private string _lblBulkPayAmount = string.Empty;
+    [ObservableProperty] private string _lblBulkPayMode = string.Empty;
+    [ObservableProperty] private string _lblBulkPayDate = string.Empty;
+    [ObservableProperty] private string _wmBulkPayRef = string.Empty;
+    [ObservableProperty] private string _btnBulkPay = string.Empty;
+    [ObservableProperty] private decimal _bulkPayAmount;
+    [ObservableProperty] private ModePaiement _bulkPayMode = ModePaiement.Especes;
+    [ObservableProperty] private DateTime? _bulkPayDate = DateTime.Today;
+    [ObservableProperty] private string _bulkPayReference = string.Empty;
 
     public ObservableCollection<ClientLedgerDisplayRow> LedgerRows { get; } = [];
     public ObservableCollection<TypeTiers> Types { get; } = [];
     public ObservableCollection<CategorieTiers> Categories { get; } = [CategorieTiers.Officiel, CategorieTiers.Comptoir];
+    public ObservableCollection<ModePaiement> BulkPayModes { get; } = [];
 
     [ObservableProperty] private int? _tiersId;
     [ObservableProperty] private TypeTiers _type = TypeTiers.Client;
@@ -153,7 +177,20 @@ public partial class TiersDetailViewModel : BaseViewModel
         LblLedgerSaveFirst = _returnScope == TiersListScope.Fournisseurs
             ? _locale.T("SupplierLedger_SaveFirst")
             : _locale.T("ClientLedger_SaveFirst");
+        LblBulkPayTitle = _locale.T("ClientLedger_BulkPayTitle");
+        LblBulkPayAmount = _locale.T("ClientLedger_BulkPayAmount");
+        LblBulkPayMode = _locale.T("ClientLedger_BulkPayMode");
+        LblBulkPayDate = _locale.T("ClientLedger_BulkPayDate");
+        WmBulkPayRef = _locale.T("ClientLedger_BulkPayRef");
+        BtnBulkPay = _locale.T("ClientLedger_BulkPayBtn");
+        UpdateShowBulkPay();
     }
+
+    private void UpdateShowBulkPay() =>
+        ShowBulkPay = ShowLedger
+            && _returnScope == TiersListScope.Clients
+            && TiersId.HasValue
+            && !ShowLedgerSaveFirst;
 
     private void RebuildTypeOptions()
     {
@@ -183,6 +220,7 @@ public partial class TiersDetailViewModel : BaseViewModel
         ShowLedger = returnScope == TiersListScope.Clients || returnScope == TiersListScope.Fournisseurs;
         ShowLedgerSaveFirst = tiersId == null && ShowLedger;
         ShowLedgerEmpty = false;
+        ResetBulkPayFields();
         RefreshDetailUi();
 
         if (tiersId == null)
@@ -199,6 +237,7 @@ public partial class TiersDetailViewModel : BaseViewModel
             Categorie = CategorieTiers.Officiel;
             Actif = true;
             UpdateShowMaxCredit();
+            UpdateShowBulkPay();
             Title = returnScope == TiersListScope.Fournisseurs
                 ? _locale.T("TiersDetail_NewSupplier")
                 : _locale.T("TiersDetail_NewClient");
@@ -257,11 +296,21 @@ public partial class TiersDetailViewModel : BaseViewModel
                 SoldeActuelText = string.Empty;
                 ShowLedgerEmpty = false;
             }
+
+            UpdateShowBulkPay();
         }
         finally
         {
             IsBusy = false;
         }
+    }
+
+    private void ResetBulkPayFields()
+    {
+        BulkPayAmount = 0;
+        BulkPayMode = ModePaiement.Especes;
+        BulkPayDate = DateTime.Today;
+        BulkPayReference = string.Empty;
     }
 
     private async Task LoadLedgerAsync(int tiersId, CancellationToken cancellationToken)
@@ -288,6 +337,121 @@ public partial class TiersDetailViewModel : BaseViewModel
     }
 
     private string FormatAmount(decimal amount) => CurrencyHelper.Format(amount, _devise);
+
+    [RelayCommand]
+    private async Task BulkPayAsync(CancellationToken cancellationToken)
+    {
+        if (TiersId is not { } clientId || !ShowBulkPay) return;
+
+        var amount = Math.Round(BulkPayAmount, 2, MidpointRounding.AwayFromZero);
+        if (amount <= 0)
+        {
+            await _dialog.ShowErrorAsync(
+                _locale.T("ClientLedger_BulkPayTitle"),
+                _locale.T("ClientLedger_BulkPayErrAmount"),
+                cancellationToken);
+            return;
+        }
+
+        try
+        {
+            var openDocs = await _bulkPayment.GetOpenDocumentsAsync(clientId, cancellationToken);
+            if (openDocs.Count == 0)
+            {
+                await _dialog.ShowErrorAsync(
+                    _locale.T("ClientLedger_BulkPayTitle"),
+                    _locale.T("ClientLedger_BulkPayErrNone"),
+                    cancellationToken);
+                return;
+            }
+
+            var totalRemaining = Math.Round(openDocs.Sum(d => d.Remaining), 2, MidpointRounding.AwayFromZero);
+            if (amount > totalRemaining + DocumentTotalsHelper.PaiementTtcTolerance)
+            {
+                await _dialog.ShowErrorAsync(
+                    _locale.T("ClientLedger_BulkPayTitle"),
+                    _locale.Tf("ClientLedger_BulkPayErrOver", FormatAmount(totalRemaining)),
+                    cancellationToken);
+                return;
+            }
+
+            BulkPaymentPreview preview;
+            try
+            {
+                preview = await _bulkPayment.PreviewAsync(clientId, amount, cancellationToken);
+            }
+            catch (InvalidOperationException ex)
+            {
+                await _dialog.ShowErrorAsync(_locale.T("ClientLedger_BulkPayTitle"), ex.Message, cancellationToken);
+                return;
+            }
+
+            var confirmMessage = BuildBulkPayPreviewMessage(preview);
+            var ok = await _dialog.ConfirmAsync(
+                _locale.T("ClientLedger_BulkPayPreviewTitle"),
+                confirmMessage,
+                cancellationToken);
+            if (!ok) return;
+
+            IsBusy = true;
+            try
+            {
+                await _bulkPayment.ApplyAsync(new ClientBulkPaymentRequest(
+                    clientId,
+                    amount,
+                    BulkPayDate?.Date ?? DateTime.Today,
+                    BulkPayMode,
+                    BulkPayReference), cancellationToken);
+
+                ResetBulkPayFields();
+                await LoadLedgerAsync(clientId, cancellationToken);
+                await _dialog.ShowInfoAsync(
+                    _locale.T("ClientLedger_BulkPayTitle"),
+                    _locale.T("ClientLedger_BulkPayDone"),
+                    cancellationToken);
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            await _dialog.ShowErrorAsync(_locale.T("ClientLedger_BulkPayTitle"), ex.Message, cancellationToken);
+        }
+    }
+
+    private string BuildBulkPayPreviewMessage(BulkPaymentPreview preview)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(_locale.Tf("ClientLedger_BulkPayPreviewHeader", FormatAmount(preview.RequestedAmount)));
+        sb.AppendLine();
+        foreach (var line in preview.Lines)
+        {
+            var designation = line.Kind == BulkPayableDocumentKind.Facture
+                ? _locale.Tf("ClientLedger_FactureFmt", line.Numero)
+                : _locale.Tf("ClientLedger_BonPreparationFmt", line.Numero);
+            if (line.WillBeFullyPaid)
+            {
+                sb.AppendLine(_locale.Tf(
+                    "ClientLedger_BulkPayPreviewLinePaid",
+                    designation,
+                    FormatAmount(line.Amount)));
+            }
+            else
+            {
+                sb.AppendLine(_locale.Tf(
+                    "ClientLedger_BulkPayPreviewLinePartial",
+                    designation,
+                    FormatAmount(line.Amount),
+                    FormatAmount(line.RemainingAfter)));
+            }
+        }
+
+        sb.AppendLine();
+        sb.Append(_locale.T("ClientLedger_BulkPayPreviewConfirm"));
+        return sb.ToString();
+    }
 
     [RelayCommand]
     private async Task ExportLedgerPdfAsync(CancellationToken cancellationToken)
