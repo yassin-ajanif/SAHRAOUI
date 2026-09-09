@@ -81,7 +81,7 @@ public sealed class DialogService : IDialogService
         {
             Text = message,
             TextWrapping = TextWrapping.Wrap,
-            MaxWidth = 440
+            MaxWidth = 480
         });
 
         var buttons = new StackPanel

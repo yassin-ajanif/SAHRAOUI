@@ -425,27 +425,19 @@ public partial class TiersDetailViewModel : BaseViewModel
     {
         var sb = new StringBuilder();
         sb.AppendLine(_locale.Tf("ClientLedger_BulkPayPreviewHeader", FormatAmount(preview.RequestedAmount)));
-        sb.AppendLine();
+
         foreach (var line in preview.Lines)
         {
+            sb.AppendLine();
             var designation = line.Kind == BulkPayableDocumentKind.Facture
                 ? _locale.Tf("ClientLedger_FactureFmt", line.Numero)
                 : _locale.Tf("ClientLedger_BonPreparationFmt", line.Numero);
+            sb.AppendLine(designation);
+            sb.AppendLine(_locale.Tf("ClientLedger_BulkPayPreviewApplied", FormatAmount(line.Amount)));
             if (line.WillBeFullyPaid)
-            {
-                sb.AppendLine(_locale.Tf(
-                    "ClientLedger_BulkPayPreviewLinePaid",
-                    designation,
-                    FormatAmount(line.Amount)));
-            }
+                sb.AppendLine(_locale.T("ClientLedger_BulkPayPreviewStatusPaid"));
             else
-            {
-                sb.AppendLine(_locale.Tf(
-                    "ClientLedger_BulkPayPreviewLinePartial",
-                    designation,
-                    FormatAmount(line.Amount),
-                    FormatAmount(line.RemainingAfter)));
-            }
+                sb.AppendLine(_locale.Tf("ClientLedger_BulkPayPreviewRemaining", FormatAmount(line.RemainingAfter)));
         }
 
         sb.AppendLine();
