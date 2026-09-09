@@ -1,4 +1,5 @@
 using System.Drawing.Printing;
+using System.Runtime.InteropServices;
 using PdfiumViewer;
 using WinFormsDialogResult = System.Windows.Forms.DialogResult;
 using WinFormsPrintDialog = System.Windows.Forms.PrintDialog;
@@ -15,8 +16,9 @@ public static class WindowsNativePdfPrinter
     public static Task<PrintResult> PrintAsync(
         string pdfPath,
         string documentTitle,
+        IntPtr ownerHandle = default,
         CancellationToken cancellationToken = default) =>
-        RunOnStaAsync(() => PrintWithSystemDialog(pdfPath, documentTitle), cancellationToken);
+        RunOnStaAsync(() => PrintWithSystemDialog(pdfPath, documentTitle, ownerHandle), cancellationToken);
 
     public static Task<PrintResult> PrintWithSettingsAsync(
         string pdfPath,
@@ -25,9 +27,12 @@ public static class WindowsNativePdfPrinter
         CancellationToken cancellationToken = default) =>
         RunOnStaAsync(() => PrintWithSettings(pdfPath, documentTitle, settings), cancellationToken);
 
-    private static PrintResult PrintWithSystemDialog(string pdfPath, string documentTitle)
+    private static PrintResult PrintWithSystemDialog(string pdfPath, string documentTitle, IntPtr ownerHandle)
     {
         var fullPath = ValidatePdfPath(pdfPath);
+
+        if (PrinterSettings.InstalledPrinters.Count == 0)
+            return Fail("Aucune imprimante n'est installée sur cet ordinateur.");
 
         using var document = PdfDocument.Load(fullPath);
         using var printDocument = document.CreatePrintDocument(PdfPrintMode.ShrinkToMargin);
@@ -41,7 +46,16 @@ public static class WindowsNativePdfPrinter
             Document = printDocument
         };
 
-        if (dialog.ShowDialog() != WinFormsDialogResult.OK)
+        // Win11 often fails to surface an unowned Print dialog from a background STA thread.
+        if (ownerHandle != IntPtr.Zero)
+            TryFocusOwner(ownerHandle);
+
+        var owner = ownerHandle != IntPtr.Zero ? new Win32WindowHandle(ownerHandle) : null;
+        var dialogResult = owner != null
+            ? dialog.ShowDialog(owner)
+            : dialog.ShowDialog();
+
+        if (dialogResult != WinFormsDialogResult.OK)
             return new PrintResult(Success: false, CancelledByUser: true, ErrorMessage: null);
 
         printDocument.Print();
@@ -114,6 +128,18 @@ public static class WindowsNativePdfPrinter
     private static PrintResult Fail(string message) =>
         new(Success: false, CancelledByUser: false, ErrorMessage: message);
 
+    private static void TryFocusOwner(IntPtr ownerHandle)
+    {
+        try
+        {
+            NativeMethods.SetForegroundWindow(ownerHandle);
+        }
+        catch
+        {
+            // Best-effort only; print dialog should still open with owner handle.
+        }
+    }
+
     private static Task<PrintResult> RunOnStaAsync(Func<PrintResult> action, CancellationToken cancellationToken)
     {
         var tcs = new TaskCompletionSource<PrintResult>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -138,5 +164,17 @@ public static class WindowsNativePdfPrinter
         thread.Start();
 
         return tcs.Task;
+    }
+
+    private sealed class Win32WindowHandle : System.Windows.Forms.IWin32Window
+    {
+        public Win32WindowHandle(IntPtr handle) => Handle = handle;
+        public IntPtr Handle { get; }
+    }
+
+    private static class NativeMethods
+    {
+        [DllImport("user32.dll")]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
     }
 }

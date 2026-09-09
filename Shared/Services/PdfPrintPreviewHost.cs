@@ -25,7 +25,10 @@ internal static class PdfPrintPreviewHost
             locale,
             async ct =>
             {
-                var result = await WindowsNativePdfPrinter.PrintAsync(pdfPath, documentTitle, ct);
+                var handle = ResolveOwnerHandle(window);
+                if (handle == IntPtr.Zero)
+                    handle = ResolveOwnerHandle(owner);
+                var result = await WindowsNativePdfPrinter.PrintAsync(pdfPath, documentTitle, handle, ct);
                 if (!result.Success && !result.CancelledByUser)
                     throw new InvalidOperationException(result.ErrorMessage ?? "L'impression a échoué.");
                 return result.Success;
@@ -47,5 +50,20 @@ internal static class PdfPrintPreviewHost
             window.Show();
 
         await closed.Task.WaitAsync(cancellationToken);
+    }
+
+    private static IntPtr ResolveOwnerHandle(Window? window)
+    {
+        if (window is null)
+            return IntPtr.Zero;
+
+        try
+        {
+            return window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        }
+        catch
+        {
+            return IntPtr.Zero;
+        }
     }
 }
