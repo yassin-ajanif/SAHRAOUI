@@ -82,6 +82,7 @@ public partial class BLEditViewModel : BaseViewModel
         _bccLinkService = bccLinkService;
         _creditLimit = creditLimit;
         _clientSolde = new ClientSoldeDisplay(clientLedger, locale);
+        WhatsApp = new WhatsAppOpenHelper(dialog, locale);
         _locale.CultureApplied += (_, _) =>
         {
             RefreshBlUi();
@@ -188,6 +189,7 @@ public partial class BLEditViewModel : BaseViewModel
     {
         BtnPdf = _locale.T("Btn_Pdf");
         BtnPrint = _locale.T("Btn_Print");
+        WhatsApp.RefreshLabels();
         BtnBack = _locale.T("Btn_Back");
         BtnSave = _locale.T("Btn_Save");
         BtnToInvoice = _locale.T("Btn_ToInvoice");
@@ -228,6 +230,7 @@ public partial class BLEditViewModel : BaseViewModel
 
     public ClientCategoryFilter ClientLookup { get; } = new();
     public ObservableCollection<GestionCommerciale.Modules.Tiers.Models.Tiers> Clients => ClientLookup.Clients;
+    public WhatsAppOpenHelper WhatsApp { get; }
     public ObservableCollection<GestionCommerciale.Modules.Stock.Models.Produit> Produits { get; } = [];
     public ObservableCollection<BLLineRow> Lignes { get; } = [];
 
@@ -287,6 +290,7 @@ public partial class BLEditViewModel : BaseViewModel
 
     partial void OnSelectedClientChanged(GestionCommerciale.Modules.Tiers.Models.Tiers? value)
     {
+        RefreshWhatsAppContact();
         var id = value?.Id ?? 0;
         if (ClientId == id)
         {
@@ -306,6 +310,15 @@ public partial class BLEditViewModel : BaseViewModel
         }
 
         _ = ClientSolde.RefreshAsync(value, Devise);
+        RefreshWhatsAppContact();
+    }
+
+    private void RefreshWhatsAppContact()
+    {
+        var prefill = string.IsNullOrWhiteSpace(Numero) || Numero.Contains('(', StringComparison.Ordinal)
+            ? null
+            : Numero;
+        WhatsApp.SetPhone(SelectedClient?.Telephone, prefill);
     }
 
     partial void OnAddLineCatalogPickChanged(object? value)

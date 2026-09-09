@@ -35,7 +35,12 @@
 
         <StackPanel Spacing="3">
           <TextBlock Text="{Binding WmTelephone}"/>
-          <TextBox Watermark="{Binding WmTelephone}" Text="{Binding Telephone}"/>
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0" Watermark="{Binding WmTelephone}" Text="{Binding Telephone}"/>
+            <Button Grid.Column="1" Margin="8,0,0,0" Padding="10,6" MinHeight="32"
+                    Content="{Binding BtnWhatsApp}" Command="{Binding OpenWhatsAppCommand}"
+                    ToolTip.Tip="{Binding TipWhatsApp}"/>
+          </Grid>
         </StackPanel>
 
         <StackPanel Spacing="3">

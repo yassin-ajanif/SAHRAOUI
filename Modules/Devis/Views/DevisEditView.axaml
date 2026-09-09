@@ -14,6 +14,8 @@
         <Button Content="{Binding BtnToBl}" Command="{Binding ToBLCommand}"/>
         <Button Content="{Binding BtnPdf}" Command="{Binding ExportPdfCommand}"/>
         <Button Content="{Binding BtnPrint}" Command="{Binding PrintCommand}"/>
+        <Button Content="{Binding WhatsApp.BtnLabel}" Command="{Binding WhatsApp.OpenCommand}"
+                IsEnabled="{Binding WhatsApp.CanOpen}" ToolTip.Tip="{Binding WhatsApp.ToolTip}"/>
       </StackPanel>
       <StackPanel Spacing="4">
         <Border Background="{DynamicResource CourseraSurfaceBrush}" CornerRadius="8,8,0,0" Padding="10,8">

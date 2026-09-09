@@ -89,6 +89,8 @@ public partial class TiersDetailViewModel : BaseViewModel
     [ObservableProperty] private string _wmAdresse = string.Empty;
     [ObservableProperty] private string _wmVille = string.Empty;
     [ObservableProperty] private string _wmTelephone = string.Empty;
+    [ObservableProperty] private string _btnWhatsApp = string.Empty;
+    [ObservableProperty] private string _tipWhatsApp = string.Empty;
     [ObservableProperty] private string _wmEmail = string.Empty;
     [ObservableProperty] private string _wmConditions = string.Empty;
     [ObservableProperty] private string _wmMaxCredit = string.Empty;
@@ -152,6 +154,8 @@ public partial class TiersDetailViewModel : BaseViewModel
         WmAdresse = _locale.T("Wm_Adresse");
         WmVille = _locale.T("Wm_Ville");
         WmTelephone = _locale.T("Wm_Telephone");
+        BtnWhatsApp = _locale.T("Btn_WhatsApp");
+        TipWhatsApp = _locale.T("Tip_WhatsApp");
         WmEmail = _locale.T("Wm_Email");
         WmConditions = _locale.T("Wm_ConditionsPaiement");
         WmMaxCredit = _locale.T("Wm_MaxCredit");
@@ -337,6 +341,18 @@ public partial class TiersDetailViewModel : BaseViewModel
     }
 
     private string FormatAmount(decimal amount) => CurrencyHelper.Format(amount, _devise);
+
+    [RelayCommand]
+    private async Task OpenWhatsAppAsync(CancellationToken cancellationToken)
+    {
+        if (WhatsAppHelper.TryOpenChat(Telephone, out var errorKey))
+            return;
+
+        await _dialog.ShowErrorAsync(
+            _locale.T("Btn_WhatsApp"),
+            _locale.T(errorKey ?? "WhatsApp_ErrPhone"),
+            cancellationToken);
+    }
 
     [RelayCommand]
     private async Task BulkPayAsync(CancellationToken cancellationToken)

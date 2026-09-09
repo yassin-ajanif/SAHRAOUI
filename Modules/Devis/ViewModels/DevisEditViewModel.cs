@@ -62,6 +62,7 @@ public partial class DevisEditViewModel : BaseViewModel
         _pdf = pdf;
         _pdfPrint = pdfPrint;
         _clientSolde = new ClientSoldeDisplay(clientLedger, locale);
+        WhatsApp = new WhatsAppOpenHelper(dialog, locale);
         _locale.CultureApplied += (_, _) =>
         {
             RefreshDevisUi();
@@ -115,6 +116,7 @@ public partial class DevisEditViewModel : BaseViewModel
     {
         BtnPdf = _locale.T("Btn_Pdf");
         BtnPrint = _locale.T("Btn_Print");
+        WhatsApp.RefreshLabels();
         BtnBack = _locale.T("Btn_Back");
         BtnSave = _locale.T("Btn_Save");
         BtnToBl = _locale.T("Btn_ToBL");
@@ -145,6 +147,7 @@ public partial class DevisEditViewModel : BaseViewModel
 
     public ClientCategoryFilter ClientLookup { get; } = new();
     public ClientSoldeDisplay ClientSolde => _clientSolde;
+    public WhatsAppOpenHelper WhatsApp { get; }
     public ObservableCollection<GestionCommerciale.Modules.Tiers.Models.Tiers> Clients => ClientLookup.Clients;
     public ObservableCollection<GestionCommerciale.Modules.Stock.Models.Produit> Produits { get; } = [];
     public ObservableCollection<DevisLineRow> Lignes { get; } = [];
@@ -275,6 +278,7 @@ public partial class DevisEditViewModel : BaseViewModel
 
     partial void OnSelectedClientChanged(GestionCommerciale.Modules.Tiers.Models.Tiers? value)
     {
+        RefreshWhatsAppContact();
         var id = value?.Id ?? 0;
         if (ClientId == id)
         {
@@ -294,6 +298,15 @@ public partial class DevisEditViewModel : BaseViewModel
         }
 
         _ = ClientSolde.RefreshAsync(value, Devise);
+        RefreshWhatsAppContact();
+    }
+
+    private void RefreshWhatsAppContact()
+    {
+        var prefill = string.IsNullOrWhiteSpace(Numero) || Numero.Contains('(', StringComparison.Ordinal)
+            ? null
+            : Numero;
+        WhatsApp.SetPhone(SelectedClient?.Telephone, prefill);
     }
 
     partial void OnDevisIdChanged(int? value) => RemoveDevisCommand.NotifyCanExecuteChanged();

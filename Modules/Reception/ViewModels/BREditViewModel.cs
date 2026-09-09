@@ -65,6 +65,7 @@ public partial class BREditViewModel : BaseViewModel
         _sp = sp;
         _session = session;
         _locale = locale;
+        WhatsApp = new WhatsAppOpenHelper(dialog, locale);
         _uiPreferences = uiPreferences;
         _stock = stock;
         _pdf = pdf;
@@ -184,6 +185,7 @@ public partial class BREditViewModel : BaseViewModel
     {
         BtnPdf = _locale.T("Btn_Pdf");
         BtnPrint = _locale.T("Btn_Print");
+        WhatsApp.RefreshLabels();
         BtnBack = _locale.T("Btn_Back");
         BtnSave = _locale.T("Btn_Save");
         BtnToInvoice = _locale.T("Btn_ToInvoice");
@@ -214,6 +216,7 @@ public partial class BREditViewModel : BaseViewModel
 
     partial void OnIsReadOnlyChanged(bool value) => OnPropertyChanged(nameof(CanEdit));
 
+    public WhatsAppOpenHelper WhatsApp { get; }
     public ObservableCollection<GestionCommerciale.Modules.Tiers.Models.Tiers> Fournisseurs { get; } = [];
     public ObservableCollection<GestionCommerciale.Modules.Stock.Models.Produit> Produits { get; } = [];
     public ObservableCollection<BRLineRow> Lignes { get; } = [];
@@ -264,6 +267,7 @@ public partial class BREditViewModel : BaseViewModel
 
     partial void OnSelectedFournisseurChanged(GestionCommerciale.Modules.Tiers.Models.Tiers? value)
     {
+        RefreshWhatsAppContact();
         var id = value?.Id ?? 0;
         if (FournisseurId == id) return;
         FournisseurId = id;
@@ -271,8 +275,17 @@ public partial class BREditViewModel : BaseViewModel
 
     partial void OnFournisseurIdChanged(int value)
     {
-        if (SelectedFournisseur?.Id == value) return;
-        SelectedFournisseur = Fournisseurs.FirstOrDefault(f => f.Id == value);
+        if (SelectedFournisseur?.Id != value)
+            SelectedFournisseur = Fournisseurs.FirstOrDefault(f => f.Id == value);
+        RefreshWhatsAppContact();
+    }
+
+    private void RefreshWhatsAppContact()
+    {
+        var prefill = string.IsNullOrWhiteSpace(Numero) || Numero.Contains('(', StringComparison.Ordinal)
+            ? null
+            : Numero;
+        WhatsApp.SetPhone(SelectedFournisseur?.Telephone, prefill);
     }
 
     partial void OnAddLineCatalogPickChanged(object? value)

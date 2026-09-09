@@ -104,6 +104,7 @@ public partial class AvoirEditViewModel : BaseViewModel
         _stock = stock;
         _settings = settings;
         _clientSolde = new ClientSoldeDisplay(clientLedger, locale);
+        WhatsApp = new WhatsAppOpenHelper(dialog, locale);
         _locale.CultureApplied += (_, _) =>
         {
             RefreshAvoirUi();
@@ -121,6 +122,7 @@ public partial class AvoirEditViewModel : BaseViewModel
 
     public ClientCategoryFilter ClientLookup { get; } = new();
     public ClientSoldeDisplay ClientSolde => _clientSolde;
+    public WhatsAppOpenHelper WhatsApp { get; }
     public ObservableCollection<GestionCommerciale.Modules.Tiers.Models.Tiers> Clients => ClientLookup.Clients;
     public ObservableCollection<Produit> Produits { get; } = [];
     public ObservableCollection<AvoirLineRow> Lignes { get; } = [];
@@ -199,6 +201,7 @@ public partial class AvoirEditViewModel : BaseViewModel
         BtnSave = _locale.T("Btn_Save");
         BtnPdf = _locale.T("Btn_Pdf");
         BtnPrint = _locale.T("Btn_Print");
+        WhatsApp.RefreshLabels();
         MenuDeleteAvoir = _locale.T("Avoir_MenuDelete");
         LblClient = _locale.T("Lbl_Client");
         WmClientSearch = _locale.T("Wm_SearchClient");
@@ -260,6 +263,7 @@ public partial class AvoirEditViewModel : BaseViewModel
 
     partial void OnSelectedClientChanged(GestionCommerciale.Modules.Tiers.Models.Tiers? value)
     {
+        RefreshWhatsAppContact();
         var id = value?.Id ?? 0;
         if (ClientId == id)
         {
@@ -279,6 +283,15 @@ public partial class AvoirEditViewModel : BaseViewModel
         }
 
         _ = ClientSolde.RefreshAsync(value, Devise);
+        RefreshWhatsAppContact();
+    }
+
+    private void RefreshWhatsAppContact()
+    {
+        var prefill = string.IsNullOrWhiteSpace(Numero) || Numero.Contains('(', StringComparison.Ordinal)
+            ? null
+            : Numero;
+        WhatsApp.SetPhone(SelectedClient?.Telephone, prefill);
     }
 
     partial void OnAddLineCatalogPickChanged(object? value)

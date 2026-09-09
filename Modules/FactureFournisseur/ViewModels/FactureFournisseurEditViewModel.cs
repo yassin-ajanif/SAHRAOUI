@@ -63,6 +63,7 @@ public partial class FactureFournisseurEditViewModel : BaseViewModel
         _sp = sp;
         _session = session;
         _locale = locale;
+        WhatsApp = new WhatsAppOpenHelper(dialog, locale);
         _uiPreferences = uiPreferences;
         _pdf = pdf;
         _pdfPrint = pdfPrint;
@@ -78,6 +79,7 @@ public partial class FactureFournisseurEditViewModel : BaseViewModel
         RefreshFactureFournisseurUi();
     }
 
+    public WhatsAppOpenHelper WhatsApp { get; }
     public ObservableCollection<GestionCommerciale.Modules.Tiers.Models.Tiers> Fournisseurs { get; } = [];
     public ObservableCollection<GestionCommerciale.Modules.Stock.Models.Produit> Produits { get; } = [];
     public ObservableCollection<FactureFournisseurLineRow> Lignes { get; } = [];
@@ -178,6 +180,7 @@ public partial class FactureFournisseurEditViewModel : BaseViewModel
     {
         BtnPdf = _locale.T("Btn_Pdf");
         BtnPrint = _locale.T("Btn_Print");
+        WhatsApp.RefreshLabels();
         BtnBack = _locale.T("Btn_Back");
         BtnSave = _locale.T("Btn_Save");
         MenuDeleteFactureFournisseur = _locale.T("Faf_MenuDelete");
@@ -446,6 +449,7 @@ public partial class FactureFournisseurEditViewModel : BaseViewModel
 
     partial void OnSelectedFournisseurChanged(GestionCommerciale.Modules.Tiers.Models.Tiers? value)
     {
+        RefreshWhatsAppContact();
         var id = value?.Id ?? 0;
         if (FournisseurId == id) return;
         FournisseurId = id;
@@ -453,8 +457,17 @@ public partial class FactureFournisseurEditViewModel : BaseViewModel
 
     partial void OnFournisseurIdChanged(int value)
     {
-        if (SelectedFournisseur?.Id == value) return;
-        SelectedFournisseur = Fournisseurs.FirstOrDefault(c => c.Id == value);
+        if (SelectedFournisseur?.Id != value)
+            SelectedFournisseur = Fournisseurs.FirstOrDefault(c => c.Id == value);
+        RefreshWhatsAppContact();
+    }
+
+    private void RefreshWhatsAppContact()
+    {
+        var prefill = string.IsNullOrWhiteSpace(Numero) || Numero.Contains('(', StringComparison.Ordinal)
+            ? null
+            : Numero;
+        WhatsApp.SetPhone(SelectedFournisseur?.Telephone, prefill);
     }
 
     public async Task LoadAsync(int? id, CancellationToken cancellationToken = default)

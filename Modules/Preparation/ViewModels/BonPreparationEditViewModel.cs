@@ -71,6 +71,7 @@ public partial class BonPreparationEditViewModel : BaseViewModel
         _pdfPrint = pdfPrint;
         _stock = stock;
         _clientSolde = new ClientSoldeDisplay(clientLedger, locale);
+        WhatsApp = new WhatsAppOpenHelper(dialog, locale);
         _creditLimit = creditLimit;
         _locale.CultureApplied += (_, _) =>
         {
@@ -88,6 +89,7 @@ public partial class BonPreparationEditViewModel : BaseViewModel
 
     public ClientCategoryFilter ClientLookup { get; } = new();
     public ClientSoldeDisplay ClientSolde => _clientSolde;
+    public WhatsAppOpenHelper WhatsApp { get; }
     public ObservableCollection<GestionCommerciale.Modules.Tiers.Models.Tiers> Clients => ClientLookup.Clients;
     public ObservableCollection<GestionCommerciale.Modules.Stock.Models.Produit> Produits { get; } = [];
     public ObservableCollection<BonPreparationLineRow> Lignes { get; } = [];
@@ -185,6 +187,7 @@ public partial class BonPreparationEditViewModel : BaseViewModel
     {
         BtnPdf = _locale.T("Btn_Pdf");
         BtnPrint = _locale.T("Btn_Print");
+        WhatsApp.RefreshLabels();
         BtnBack = _locale.T("Btn_Back");
         BtnSave = _locale.T("Btn_Save");
         MenuDeleteBonPreparation = _locale.T("Bp_MenuDelete");
@@ -458,6 +461,7 @@ public partial class BonPreparationEditViewModel : BaseViewModel
 
     partial void OnSelectedClientChanged(GestionCommerciale.Modules.Tiers.Models.Tiers? value)
     {
+        RefreshWhatsAppContact();
         var id = value?.Id ?? 0;
         if (ClientId == id)
         {
@@ -477,6 +481,15 @@ public partial class BonPreparationEditViewModel : BaseViewModel
         }
 
         _ = ClientSolde.RefreshAsync(value, Devise);
+        RefreshWhatsAppContact();
+    }
+
+    private void RefreshWhatsAppContact()
+    {
+        var prefill = string.IsNullOrWhiteSpace(Numero) || Numero.Contains('(', StringComparison.Ordinal)
+            ? null
+            : Numero;
+        WhatsApp.SetPhone(SelectedClient?.Telephone, prefill);
     }
 
     public async Task LoadAsync(int? id, CancellationToken cancellationToken = default)
