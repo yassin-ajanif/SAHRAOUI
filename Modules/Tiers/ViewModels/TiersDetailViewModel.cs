@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GestionCommerciale.Modules.Facturation.Models;
 using GestionCommerciale.Modules.Facturation.Services;
+using GestionCommerciale.Modules.FactureFournisseur.Services;
 using GestionCommerciale.Modules.Reception.Services;
 using GestionCommerciale.Modules.Tiers.Models;
 using GestionCommerciale.Shared.Database;
@@ -35,6 +36,7 @@ public partial class TiersDetailViewModel : BaseViewModel
     private readonly ILocaleService _locale;
     private readonly IClientAccountStatementService _clientLedgerService;
     private readonly IClientBulkPaymentService _bulkPayment;
+    private readonly ISupplierBulkPaymentService _supplierBulkPayment;
     private readonly ISupplierAccountStatementService _supplierLedgerService;
     private readonly IPdfService _pdf;
     private readonly IAppSettingsService _settings;
@@ -52,6 +54,7 @@ public partial class TiersDetailViewModel : BaseViewModel
         ILocaleService locale,
         IClientAccountStatementService clientLedgerService,
         IClientBulkPaymentService bulkPayment,
+        ISupplierBulkPaymentService supplierBulkPayment,
         ISupplierAccountStatementService supplierLedgerService,
         IPdfService pdf,
         IAppSettingsService settings)
@@ -63,6 +66,7 @@ public partial class TiersDetailViewModel : BaseViewModel
         _locale = locale;
         _clientLedgerService = clientLedgerService;
         _bulkPayment = bulkPayment;
+        _supplierBulkPayment = supplierBulkPayment;
         _supplierLedgerService = supplierLedgerService;
         _pdf = pdf;
         _settings = settings;
@@ -181,18 +185,24 @@ public partial class TiersDetailViewModel : BaseViewModel
         LblLedgerSaveFirst = _returnScope == TiersListScope.Fournisseurs
             ? _locale.T("SupplierLedger_SaveFirst")
             : _locale.T("ClientLedger_SaveFirst");
-        LblBulkPayTitle = _locale.T("ClientLedger_BulkPayTitle");
-        LblBulkPayAmount = _locale.T("ClientLedger_BulkPayAmount");
+        LblBulkPayTitle = _returnScope == TiersListScope.Fournisseurs
+            ? _locale.T("SupplierLedger_BulkPayTitle")
+            : _locale.T("ClientLedger_BulkPayTitle");
+        LblBulkPayAmount = _returnScope == TiersListScope.Fournisseurs
+            ? _locale.T("SupplierLedger_BulkPayAmount")
+            : _locale.T("ClientLedger_BulkPayAmount");
         LblBulkPayMode = _locale.T("ClientLedger_BulkPayMode");
         LblBulkPayDate = _locale.T("ClientLedger_BulkPayDate");
         WmBulkPayRef = _locale.T("ClientLedger_BulkPayRef");
-        BtnBulkPay = _locale.T("ClientLedger_BulkPayBtn");
+        BtnBulkPay = _returnScope == TiersListScope.Fournisseurs
+            ? _locale.T("SupplierLedger_BulkPayBtn")
+            : _locale.T("ClientLedger_BulkPayBtn");
         UpdateShowBulkPay();
     }
 
     private void UpdateShowBulkPay() =>
         ShowBulkPay = ShowLedger
-            && _returnScope == TiersListScope.Clients
+            && (_returnScope == TiersListScope.Clients || _returnScope == TiersListScope.Fournisseurs)
             && TiersId.HasValue
             && !ShowLedgerSaveFirst;
 
@@ -357,87 +367,161 @@ public partial class TiersDetailViewModel : BaseViewModel
     [RelayCommand]
     private async Task BulkPayAsync(CancellationToken cancellationToken)
     {
-        if (TiersId is not { } clientId || !ShowBulkPay) return;
+        if (TiersId is not { } tiersId || !ShowBulkPay) return;
+
+        var isSupplier = _returnScope == TiersListScope.Fournisseurs;
+        var titleKey = isSupplier ? "SupplierLedger_BulkPayTitle" : "ClientLedger_BulkPayTitle";
 
         var amount = Math.Round(BulkPayAmount, 2, MidpointRounding.AwayFromZero);
         if (amount <= 0)
         {
             await _dialog.ShowErrorAsync(
-                _locale.T("ClientLedger_BulkPayTitle"),
-                _locale.T("ClientLedger_BulkPayErrAmount"),
+                _locale.T(titleKey),
+                _locale.T(isSupplier ? "SupplierLedger_BulkPayErrAmount" : "ClientLedger_BulkPayErrAmount"),
                 cancellationToken);
             return;
         }
 
         try
         {
-            var openDocs = await _bulkPayment.GetOpenDocumentsAsync(clientId, cancellationToken);
-            if (openDocs.Count == 0)
-            {
-                await _dialog.ShowErrorAsync(
-                    _locale.T("ClientLedger_BulkPayTitle"),
-                    _locale.T("ClientLedger_BulkPayErrNone"),
-                    cancellationToken);
-                return;
-            }
-
-            var totalRemaining = Math.Round(openDocs.Sum(d => d.Remaining), 2, MidpointRounding.AwayFromZero);
-            if (amount > totalRemaining + DocumentTotalsHelper.PaiementTtcTolerance)
-            {
-                await _dialog.ShowErrorAsync(
-                    _locale.T("ClientLedger_BulkPayTitle"),
-                    _locale.Tf("ClientLedger_BulkPayErrOver", FormatAmount(totalRemaining)),
-                    cancellationToken);
-                return;
-            }
-
-            BulkPaymentPreview preview;
-            try
-            {
-                preview = await _bulkPayment.PreviewAsync(clientId, amount, cancellationToken);
-            }
-            catch (InvalidOperationException ex)
-            {
-                await _dialog.ShowErrorAsync(_locale.T("ClientLedger_BulkPayTitle"), ex.Message, cancellationToken);
-                return;
-            }
-
-            var confirmMessage = BuildBulkPayPreviewMessage(preview);
-            var ok = await _dialog.ConfirmAsync(
-                _locale.T("ClientLedger_BulkPayPreviewTitle"),
-                confirmMessage,
-                cancellationToken);
-            if (!ok) return;
-
-            IsBusy = true;
-            try
-            {
-                await _bulkPayment.ApplyAsync(new ClientBulkPaymentRequest(
-                    clientId,
-                    amount,
-                    BulkPayDate?.Date ?? DateTime.Today,
-                    BulkPayMode,
-                    BulkPayReference), cancellationToken);
-
-                ResetBulkPayFields();
-                await LoadLedgerAsync(clientId, cancellationToken);
-                await _dialog.ShowInfoAsync(
-                    _locale.T("ClientLedger_BulkPayTitle"),
-                    _locale.T("ClientLedger_BulkPayDone"),
-                    cancellationToken);
-            }
-            finally
-            {
-                IsBusy = false;
-            }
+            if (isSupplier)
+                await BulkPaySupplierAsync(tiersId, amount, titleKey, cancellationToken);
+            else
+                await BulkPayClientAsync(tiersId, amount, titleKey, cancellationToken);
         }
         catch (Exception ex)
         {
-            await _dialog.ShowErrorAsync(_locale.T("ClientLedger_BulkPayTitle"), ex.Message, cancellationToken);
+            await _dialog.ShowErrorAsync(_locale.T(titleKey), ex.Message, cancellationToken);
         }
     }
 
-    private string BuildBulkPayPreviewMessage(BulkPaymentPreview preview)
+    private async Task BulkPayClientAsync(int clientId, decimal amount, string titleKey, CancellationToken cancellationToken)
+    {
+        var openDocs = await _bulkPayment.GetOpenDocumentsAsync(clientId, cancellationToken);
+        if (openDocs.Count == 0)
+        {
+            await _dialog.ShowErrorAsync(
+                _locale.T(titleKey),
+                _locale.T("ClientLedger_BulkPayErrNone"),
+                cancellationToken);
+            return;
+        }
+
+        var totalRemaining = Math.Round(openDocs.Sum(d => d.Remaining), 2, MidpointRounding.AwayFromZero);
+        if (amount > totalRemaining + DocumentTotalsHelper.PaiementTtcTolerance)
+        {
+            await _dialog.ShowErrorAsync(
+                _locale.T(titleKey),
+                _locale.Tf("ClientLedger_BulkPayErrOver", FormatAmount(totalRemaining)),
+                cancellationToken);
+            return;
+        }
+
+        BulkPaymentPreview preview;
+        try
+        {
+            preview = await _bulkPayment.PreviewAsync(clientId, amount, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _dialog.ShowErrorAsync(_locale.T(titleKey), ex.Message, cancellationToken);
+            return;
+        }
+
+        var confirmMessage = BuildClientBulkPayPreviewMessage(preview);
+        var ok = await _dialog.ConfirmAsync(
+            _locale.T("ClientLedger_BulkPayPreviewTitle"),
+            confirmMessage,
+            cancellationToken);
+        if (!ok) return;
+
+        IsBusy = true;
+        try
+        {
+            await _bulkPayment.ApplyAsync(new ClientBulkPaymentRequest(
+                clientId,
+                amount,
+                BulkPayDate?.Date ?? DateTime.Today,
+                BulkPayMode,
+                BulkPayReference), cancellationToken);
+
+            ResetBulkPayFields();
+            await LoadLedgerAsync(clientId, cancellationToken);
+            await _dialog.ShowInfoAsync(
+                _locale.T(titleKey),
+                _locale.T("ClientLedger_BulkPayDone"),
+                cancellationToken);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private async Task BulkPaySupplierAsync(int fournisseurId, decimal amount, string titleKey, CancellationToken cancellationToken)
+    {
+        var openDocs = await _supplierBulkPayment.GetOpenDocumentsAsync(fournisseurId, cancellationToken);
+        if (openDocs.Count == 0)
+        {
+            await _dialog.ShowErrorAsync(
+                _locale.T(titleKey),
+                _locale.T("SupplierLedger_BulkPayErrNone"),
+                cancellationToken);
+            return;
+        }
+
+        var totalRemaining = Math.Round(openDocs.Sum(d => d.Remaining), 2, MidpointRounding.AwayFromZero);
+        if (amount > totalRemaining + DocumentTotalsHelper.PaiementTtcTolerance)
+        {
+            await _dialog.ShowErrorAsync(
+                _locale.T(titleKey),
+                _locale.Tf("SupplierLedger_BulkPayErrOver", FormatAmount(totalRemaining)),
+                cancellationToken);
+            return;
+        }
+
+        SupplierBulkPaymentPreview preview;
+        try
+        {
+            preview = await _supplierBulkPayment.PreviewAsync(fournisseurId, amount, cancellationToken);
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _dialog.ShowErrorAsync(_locale.T(titleKey), ex.Message, cancellationToken);
+            return;
+        }
+
+        var confirmMessage = BuildSupplierBulkPayPreviewMessage(preview);
+        var ok = await _dialog.ConfirmAsync(
+            _locale.T("SupplierLedger_BulkPayPreviewTitle"),
+            confirmMessage,
+            cancellationToken);
+        if (!ok) return;
+
+        IsBusy = true;
+        try
+        {
+            await _supplierBulkPayment.ApplyAsync(new SupplierBulkPaymentRequest(
+                fournisseurId,
+                amount,
+                BulkPayDate?.Date ?? DateTime.Today,
+                BulkPayMode,
+                BulkPayReference), cancellationToken);
+
+            ResetBulkPayFields();
+            await LoadLedgerAsync(fournisseurId, cancellationToken);
+            await _dialog.ShowInfoAsync(
+                _locale.T(titleKey),
+                _locale.T("SupplierLedger_BulkPayDone"),
+                cancellationToken);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private string BuildClientBulkPayPreviewMessage(BulkPaymentPreview preview)
     {
         var sb = new StringBuilder();
         sb.AppendLine(_locale.Tf("ClientLedger_BulkPayPreviewHeader", FormatAmount(preview.RequestedAmount)));
@@ -458,6 +542,27 @@ public partial class TiersDetailViewModel : BaseViewModel
 
         sb.AppendLine();
         sb.Append(_locale.T("ClientLedger_BulkPayPreviewConfirm"));
+        return sb.ToString();
+    }
+
+    private string BuildSupplierBulkPayPreviewMessage(SupplierBulkPaymentPreview preview)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(_locale.Tf("SupplierLedger_BulkPayPreviewHeader", FormatAmount(preview.RequestedAmount)));
+
+        foreach (var line in preview.Lines)
+        {
+            sb.AppendLine();
+            sb.AppendLine(_locale.Tf("SupplierLedger_FactureFmt", line.Numero));
+            sb.AppendLine(_locale.Tf("SupplierLedger_BulkPayPreviewApplied", FormatAmount(line.Amount)));
+            if (line.WillBeFullyPaid)
+                sb.AppendLine(_locale.T("SupplierLedger_BulkPayPreviewStatusPaid"));
+            else
+                sb.AppendLine(_locale.Tf("SupplierLedger_BulkPayPreviewRemaining", FormatAmount(line.RemainingAfter)));
+        }
+
+        sb.AppendLine();
+        sb.Append(_locale.T("SupplierLedger_BulkPayPreviewConfirm"));
         return sb.ToString();
     }
 
