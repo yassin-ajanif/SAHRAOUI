@@ -206,11 +206,12 @@ public static class CommercialDocumentPdfRenderer
                 });
                 if (model.ShowTaxAndTtcInTotalsBox)
                 {
-                    col.Item().Row(r =>
-                    {
-                        r.RelativeItem().Text("TVA (20%) :").FontColor(TextSecondary);
-                        r.AutoItem().Text($"{model.TotalTva:N2} {model.Devise}").SemiBold();
-                    });
+                    // TVA hidden on PDF output (requested).
+                    // col.Item().Row(r =>
+                    // {
+                    //     r.RelativeItem().Text("TVA (20%) :").FontColor(TextSecondary);
+                    //     r.AutoItem().Text($"{model.TotalTva:N2} {model.Devise}").SemiBold();
+                    // });
                     col.Item().PaddingTop(4).LineHorizontal(0.5f).LineColor(TableBorder);
                     col.Item().PaddingTop(6).Row(r =>
                     {

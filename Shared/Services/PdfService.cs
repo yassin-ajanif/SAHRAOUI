@@ -674,8 +674,9 @@ public sealed class PdfService : IPdfService
             columns.Add(new PdfTableColumn("Ute", 0.25f, PdfTextAlignment.Center));
         if (v.ShowPuHt)
             columns.Add(new PdfTableColumn("PU HT", 0.55f, PdfTextAlignment.Center));
-        if (v.ShowTva)
-            columns.Add(new PdfTableColumn("Tva", 0.25f, PdfTextAlignment.Center));
+        // TVA column hidden on PDF output (requested).
+        // if (v.ShowTva)
+        //     columns.Add(new PdfTableColumn("Tva", 0.25f, PdfTextAlignment.Center));
         if (v.ShowRemise)
             columns.Add(new PdfTableColumn("Rem. %", 0.35f, PdfTextAlignment.Center));
         if (v.ShowMontantHt)
@@ -698,8 +699,9 @@ public sealed class PdfService : IPdfService
             cells.Add(line.Unite);
         if (v.ShowPuHt)
             cells.Add(line.PuHt);
-        if (v.ShowTva)
-            cells.Add(line.Tva);
+        // TVA column hidden on PDF output (requested).
+        // if (v.ShowTva)
+        //     cells.Add(line.Tva);
         if (v.ShowRemise)
             cells.Add(line.Remise);
         if (v.ShowMontantHt)
