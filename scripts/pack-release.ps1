@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-$Version = "1.0.3"
+$Version = "1.0.4"
 $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
 $PublishDir = Join-Path $ProjectRoot "publish"
