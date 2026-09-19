@@ -322,7 +322,6 @@ internal static class UiTranslationExtras
         ["Settings_WmDevise"] = ("Ex. MAD, EUR", "مثال MAD، EUR"),
 
         ["Report_LblCa"] = ("Chiffre d'affaires TTC (factures du mois — date de facture)", "إجمالي المبيعات ش.ض.ق. (فواتير الشهر — تاريخ الفاتورة)"),
-        ["Report_LblCaDelta"] = ("Variation", "التغير"),
         ["Report_LblKpiStrip"] = ("Chiffres clés", "أرقام أساسية"),
         ["Report_LblTopClients"] = ("Top 5 clients (12 mois, TTC)", "أفضل 5 عملاء (12 شهراً، إجمالي)"),
         ["Report_LblTopProducts"] = ("Top 5 produits (quantités livrées, 12 mois)", "أفضل 5 منتجات (كميات مسلَّمة، 12 شهراً)"),
@@ -330,9 +329,6 @@ internal static class UiTranslationExtras
         ["Report_LblUnpaid"] = ("Factures impayées", "فواتير غير مدفوعة"),
         ["Report_FmtCurrentMonth"] = ("Mois en cours: {0}", "الشهر الحالي: {0}"),
         ["Report_FmtPrevMonth"] = ("Mois précédent: {0}", "الشهر السابق: {0}"),
-        ["Report_FmtCaDeltaZero"] = ("Évolution vs mois précédent: stable", "التغير مقارنة بالشهر السابق: مستقر"),
-        ["Report_FmtCaDeltaFromZero"] = ("Évolution vs mois précédent: activité nouvelle", "التغير مقارنة بالشهر السابق: نشاط جديد"),
-        ["Report_FmtCaDeltaFmt"] = ("Évolution vs mois précédent: {0} ({1}%)", "التغير مقارنة بالشهر السابق: {0} ({1}٪)"),
         ["Report_FmtStockAlert"] = ("{0} — stock {1} / min {2}", "{0} — مخزون {1} / أدنى {2}"),
         ["Report_FmtStockDetail"] = ("Stock actuel {0} — minimum {1}", "المخزون الحالي {0} — الأدنى {1}"),
         ["Report_UnpaidDueToday"] = ("Échéance aujourd'hui", "الاستحقاق اليوم"),
@@ -348,7 +344,8 @@ internal static class UiTranslationExtras
         ["Report_KpiBc"] = ("BC mois en cours / total: {0} / {1}", "أوامر شراء الشهر / الإجمالي: {0} / {1}"),
         ["Report_KpiBrMonth"] = ("BR (mois en cours): {0}", "أذون استلام (الشهر الحالي): {0}"),
         ["Report_KpiEncours"] = ("Encours impayé: {0} — {1} facture(s)", "الذمم المفتوحة: {0} — {1} فاتورة"),
-        ["Report_KpiStock"] = ("SKU actifs: {0} — sous minimum: {1} ({2}%)", "أصناف نشطة: {0} — تحت الحد: {1} ({2}٪)"),
+        ["Report_KpiSupplierSoldes"] = ("Soldes fournisseurs: {0} — {1} fournisseur(s)", "أرصدة الموردين: {0} — {1} مورد"),
+        ["Report_KpiClientSoldes"] = ("Soldes clients: {0} — {1} client(s)", "أرصدة العملاء: {0} — {1} عميل"),
         ["Report_Loading"] = ("Chargement…", "جاري التحميل…"),
 
         ["Hist_Devis"] = ("Devis", "عرض سعر"),

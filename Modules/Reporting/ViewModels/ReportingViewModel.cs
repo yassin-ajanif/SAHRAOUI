@@ -4,6 +4,8 @@ using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GestionCommerciale.Modules.Auth.Services;
+using GestionCommerciale.Modules.AvoirFournisseur.Models;
+using GestionCommerciale.Modules.Facturation.Models;
 using GestionCommerciale.Modules.Stock;
 using GestionCommerciale.Shared.Database;
 using GestionCommerciale.Shared.Helpers;
@@ -41,7 +43,6 @@ public partial class ReportingViewModel : BaseViewModel
     }
 
     [ObservableProperty] private string _lblCa = string.Empty;
-    [ObservableProperty] private string _lblCaDelta = string.Empty;
     [ObservableProperty] private string _lblKpiStrip = string.Empty;
     [ObservableProperty] private string _lblTopClients = string.Empty;
     [ObservableProperty] private string _lblTopProducts = string.Empty;
@@ -49,7 +50,6 @@ public partial class ReportingViewModel : BaseViewModel
     [ObservableProperty] private string _lblUnpaid = string.Empty;
     [ObservableProperty] private string _lineCaCurrent = string.Empty;
     [ObservableProperty] private string _lineCaPrev = string.Empty;
-    [ObservableProperty] private string _lineCaDelta = string.Empty;
     [ObservableProperty] private string _lblLoading = string.Empty;
 
     [ObservableProperty] private string _caMoisCourant = string.Empty;
@@ -61,7 +61,8 @@ public partial class ReportingViewModel : BaseViewModel
     [ObservableProperty] private string _kpiBc = string.Empty;
     [ObservableProperty] private string _kpiBrMonth = string.Empty;
     [ObservableProperty] private string _kpiEncours = string.Empty;
-    [ObservableProperty] private string _kpiStock = string.Empty;
+    [ObservableProperty] private string _kpiSupplierSoldes = string.Empty;
+    [ObservableProperty] private string _kpiClientSoldes = string.Empty;
 
     [ObservableProperty] private bool _showEmptyTopClients;
     [ObservableProperty] private bool _showEmptyTopProducts;
@@ -83,7 +84,6 @@ public partial class ReportingViewModel : BaseViewModel
         Title = _locale.T("Report_Title");
         LblLoading = _locale.T("Report_Loading");
         LblCa = _locale.T("Report_LblCa");
-        LblCaDelta = _locale.T("Report_LblCaDelta");
         LblKpiStrip = _locale.T("Report_LblKpiStrip");
         LblTopClients = _locale.T("Report_LblTopClients");
         LblTopProducts = _locale.T("Report_LblTopProducts");
@@ -145,14 +145,14 @@ public partial class ReportingViewModel : BaseViewModel
         CaMoisPrecedent = data.CaMoisPrecedent;
         LineCaCurrent = data.LineCaCurrent;
         LineCaPrev = data.LineCaPrev;
-        LineCaDelta = data.LineCaDelta;
         KpiDevis30 = data.KpiDevis30;
         KpiDevisExpire = data.KpiDevisExpire;
         KpiBlMonth = data.KpiBlMonth;
         KpiBc = data.KpiBc;
         KpiBrMonth = data.KpiBrMonth;
-        KpiStock = data.KpiStock;
         KpiEncours = data.KpiEncours;
+        KpiSupplierSoldes = data.KpiSupplierSoldes;
+        KpiClientSoldes = data.KpiClientSoldes;
 
         TopClients.Clear();
         foreach (var r in data.TopClients)
@@ -271,11 +271,6 @@ public partial class ReportingViewModel : BaseViewModel
                     p.StockMinimum.ToString("N2", CultureInfo.CurrentCulture))));
         }
 
-        var actifs = await db.Produits.AsNoTracking().CountAsync(p => p.Actif, ct);
-        var sousMin = await db.Produits.AsNoTracking().CountAsync(
-            p => p.Actif && p.StockMinimum > 0 && p.StockActuel < p.StockMinimum, ct);
-        var pctSous = actifs > 0 ? (double)sousMin / actifs * 100.0 : 0;
-
         var unpaidProj = await db.Factures.AsNoTracking()
             .Where(f => !f.EstPayee)
             .Select(f => new {
@@ -325,6 +320,9 @@ public partial class ReportingViewModel : BaseViewModel
                 isDueSoon));
         }
 
+        var (supplierSoldesTotal, supplierSoldesCount) = await ComputeSupplierSoldesAsync(db, ct);
+        var (clientSoldesTotal, clientSoldesCount) = await ComputeClientSoldesAsync(db, ct);
+
         return new ReportData
         {
             Devise = dev,
@@ -332,14 +330,14 @@ public partial class ReportingViewModel : BaseViewModel
             CaMoisPrecedent = CurrencyHelper.Format(caPrev, dev),
             LineCaCurrent = FormatCaLine(_locale, "Report_FmtCurrentMonth", caCur, dev),
             LineCaPrev = FormatCaLine(_locale, "Report_FmtPrevMonth", caPrev, dev),
-            LineCaDelta = FormatCaDelta(caCur, caPrev, dev, _locale),
             KpiDevis30 = _locale.Tf("Report_KpiDevis30", devis30.ToString(CultureInfo.CurrentCulture)),
             KpiDevisExpire = _locale.Tf("Report_KpiDevisExpire", devisExpire.ToString(CultureInfo.CurrentCulture)),
             KpiBlMonth = _locale.Tf("Report_KpiBlMonth", blMonth.ToString(CultureInfo.CurrentCulture)),
             KpiBc = _locale.Tf("Report_KpiBc", bcMonth.ToString(CultureInfo.CurrentCulture), bcTotal.ToString(CultureInfo.CurrentCulture)),
             KpiBrMonth = _locale.Tf("Report_KpiBrMonth", brMonth.ToString(CultureInfo.CurrentCulture)),
-            KpiStock = _locale.Tf("Report_KpiStock", actifs.ToString(CultureInfo.CurrentCulture), sousMin.ToString(CultureInfo.CurrentCulture), pctSous.ToString("F0", CultureInfo.CurrentCulture)),
             KpiEncours = _locale.Tf("Report_KpiEncours", CurrencyHelper.Format(encoursTotal, dev), encoursCount.ToString(CultureInfo.CurrentCulture)),
+            KpiSupplierSoldes = _locale.Tf("Report_KpiSupplierSoldes", CurrencyHelper.Format(supplierSoldesTotal, dev), supplierSoldesCount.ToString(CultureInfo.CurrentCulture)),
+            KpiClientSoldes = _locale.Tf("Report_KpiClientSoldes", CurrencyHelper.Format(clientSoldesTotal, dev), clientSoldesCount.ToString(CultureInfo.CurrentCulture)),
             TopClients = topClientRows,
             TopProduits = topProdRows,
             StockAlertes = stockAlertRows,
@@ -358,18 +356,119 @@ public partial class ReportingViewModel : BaseViewModel
     private static string FormatCaLine(ILocaleService locale, string key, decimal amount, string dev)
         => locale.Tf(key, CurrencyHelper.Format(amount, dev));
 
-    private static string FormatCaDelta(decimal caCur, decimal caPrev, string dev, ILocaleService locale)
+    private static async Task<(decimal total, int count)> ComputeClientSoldesAsync(AppDbContext db, CancellationToken ct)
     {
-        if (Math.Abs(caPrev) < 0.01m && Math.Abs(caCur) < 0.01m)
-            return locale.T("Report_FmtCaDeltaZero");
-        if (Math.Abs(caPrev) < 0.01m)
-            return locale.T("Report_FmtCaDeltaFromZero");
+        var debits = new Dictionary<int, decimal>();
+        MergeAmounts(debits, await db.Factures.AsNoTracking()
+            .GroupBy(f => f.ClientId)
+            .Select(g => new ValueTuple<int, decimal>(g.Key, g.Sum(f => f.TotalTtc)))
+            .ToListAsync(ct));
+        MergeAmounts(debits, await db.BonsPreparation.AsNoTracking()
+            .GroupBy(b => b.ClientId)
+            .Select(g => new ValueTuple<int, decimal>(g.Key, g.Sum(b => b.TotalTtc)))
+            .ToListAsync(ct));
 
-        var diff = caCur - caPrev;
-        var pct = (double)(diff / caPrev * 100m);
-        return locale.Tf("Report_FmtCaDeltaFmt",
-            CurrencyHelper.Format(diff, dev),
-            pct.ToString("F1", CultureInfo.CurrentCulture));
+        var credits = new Dictionary<int, decimal>();
+        MergeAmounts(credits, await (
+            from p in db.Paiements.AsNoTracking()
+            join f in db.Factures.AsNoTracking() on p.FactureId equals f.Id
+            where p.Montant > 0 && p.Mode != ModePaiement.Credit
+            group p by f.ClientId into g
+            select new ValueTuple<int, decimal>(g.Key, g.Sum(p => p.Montant))
+        ).ToListAsync(ct));
+        MergeAmounts(credits, await (
+            from p in db.PaiementsBonPreparation.AsNoTracking()
+            join b in db.BonsPreparation.AsNoTracking() on p.BonPreparationId equals b.Id
+            where p.Montant > 0 && p.Mode != ModePaiement.Credit
+            group p by b.ClientId into g
+            select new ValueTuple<int, decimal>(g.Key, g.Sum(p => p.Montant))
+        ).ToListAsync(ct));
+
+        var avoirs = await db.Avoirs.AsNoTracking()
+            .Select(a => new
+            {
+                a.ClientId,
+                Lignes = a.Lignes!.Select(l => new AvoirLigne
+                {
+                    Quantite = l.Quantite,
+                    PrixUnitaireHT = l.PrixUnitaireHT,
+                    Remise = l.Remise,
+                    TauxTVA = l.TauxTVA
+                }).ToList()
+            })
+            .ToListAsync(ct);
+        foreach (var a in avoirs)
+        {
+            var (_, _, ttc) = DocumentTotalsHelper.AvoirTotals(a.Lignes);
+            if (ttc <= 0) continue;
+            credits[a.ClientId] = credits.GetValueOrDefault(a.ClientId) + ttc;
+        }
+
+        return SumPositiveBalances(debits, credits);
+    }
+
+    private static async Task<(decimal total, int count)> ComputeSupplierSoldesAsync(AppDbContext db, CancellationToken ct)
+    {
+        var debits = new Dictionary<int, decimal>();
+        MergeAmounts(debits, await db.FacturesFournisseurs.AsNoTracking()
+            .GroupBy(f => f.FournisseurId)
+            .Select(g => new ValueTuple<int, decimal>(g.Key, g.Sum(f => f.TotalTtc)))
+            .ToListAsync(ct));
+
+        var credits = new Dictionary<int, decimal>();
+        MergeAmounts(credits, await (
+            from p in db.PaiementsFournisseurs.AsNoTracking()
+            join f in db.FacturesFournisseurs.AsNoTracking() on p.FactureFournisseurId equals f.Id
+            where p.Montant > 0 && p.Mode != ModePaiement.Credit
+            group p by f.FournisseurId into g
+            select new ValueTuple<int, decimal>(g.Key, g.Sum(p => p.Montant))
+        ).ToListAsync(ct));
+
+        var avoirs = await db.AvoirsFournisseurs.AsNoTracking()
+            .Select(a => new
+            {
+                a.FournisseurId,
+                Lignes = a.Lignes!.Select(l => new AvoirFournisseurLigne
+                {
+                    Quantite = l.Quantite,
+                    PrixUnitaireHT = l.PrixUnitaireHT,
+                    Remise = l.Remise,
+                    TauxTVA = l.TauxTVA
+                }).ToList()
+            })
+            .ToListAsync(ct);
+        foreach (var a in avoirs)
+        {
+            var (_, _, ttc) = DocumentTotalsHelper.AvoirFournisseurTotals(a.Lignes);
+            if (ttc <= 0) continue;
+            credits[a.FournisseurId] = credits.GetValueOrDefault(a.FournisseurId) + ttc;
+        }
+
+        return SumPositiveBalances(debits, credits);
+    }
+
+    private static void MergeAmounts(Dictionary<int, decimal> target, IEnumerable<(int Id, decimal Sum)> rows)
+    {
+        foreach (var (id, sum) in rows)
+            target[id] = target.GetValueOrDefault(id) + sum;
+    }
+
+    private static (decimal total, int count) SumPositiveBalances(
+        Dictionary<int, decimal> debits,
+        Dictionary<int, decimal> credits)
+    {
+        decimal total = 0;
+        var count = 0;
+        foreach (var id in debits.Keys.Union(credits.Keys))
+        {
+            var balance = debits.GetValueOrDefault(id) - credits.GetValueOrDefault(id);
+            if (balance <= 0.01m) continue;
+
+            total += balance;
+            count++;
+        }
+
+        return (total, count);
     }
 }
 
@@ -380,14 +479,14 @@ internal sealed class ReportData
     public string CaMoisPrecedent { get; init; } = string.Empty;
     public string LineCaCurrent { get; init; } = string.Empty;
     public string LineCaPrev { get; init; } = string.Empty;
-    public string LineCaDelta { get; init; } = string.Empty;
     public string KpiDevis30 { get; init; } = string.Empty;
     public string KpiDevisExpire { get; init; } = string.Empty;
     public string KpiBlMonth { get; init; } = string.Empty;
     public string KpiBc { get; init; } = string.Empty;
     public string KpiBrMonth { get; init; } = string.Empty;
-    public string KpiStock { get; init; } = string.Empty;
     public string KpiEncours { get; init; } = string.Empty;
+    public string KpiSupplierSoldes { get; init; } = string.Empty;
+    public string KpiClientSoldes { get; init; } = string.Empty;
     public List<ReportRankRow> TopClients { get; init; } = [];
     public List<ReportRankRow> TopProduits { get; init; } = [];
     public List<ReportStockAlertRow> StockAlertes { get; init; } = [];
