@@ -148,10 +148,20 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="vm:ClientLedgerDisplayRow">
                   <Border Padding="8,6" Margin="0,0,0,2"
-                          Background="{DynamicResource CourseraSurfaceMutedBrush}" CornerRadius="6">
+                          Background="{DynamicResource CourseraSurfaceMutedBrush}" CornerRadius="6"
+                          Cursor="Hand" Tapped="OnLedgerRowTapped">
                     <Grid ColumnDefinitions="90,2*,1.2*,90,90,100">
                       <TextBlock Grid.Column="0" Text="{Binding DateText}" FontSize="12" VerticalAlignment="Center"/>
-                      <TextBlock Grid.Column="1" Text="{Binding Designation}" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                      <Button Grid.Column="1" Classes="docLink"
+                              Content="{Binding Designation}"
+                              FontSize="12"
+                              HorizontalAlignment="Left"
+                              HorizontalContentAlignment="Left"
+                              IsVisible="{Binding IsNavigable}"
+                              Command="{Binding $parent[UserControl].((vm:TiersDetailViewModel)DataContext).OpenLedgerDocumentCommand}"
+                              CommandParameter="{Binding}"/>
+                      <TextBlock Grid.Column="1" Text="{Binding Designation}" FontSize="12" VerticalAlignment="Center"
+                                 TextWrapping="Wrap" IsVisible="{Binding !IsNavigable}"/>
                       <TextBlock Grid.Column="2" Text="{Binding Observation}" FontSize="12" Classes="subtle" VerticalAlignment="Center" TextWrapping="Wrap"/>
                       <TextBlock Grid.Column="3" Text="{Binding DebitText}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"/>
                       <TextBlock Grid.Column="4" Text="{Binding CreditText}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center"/>

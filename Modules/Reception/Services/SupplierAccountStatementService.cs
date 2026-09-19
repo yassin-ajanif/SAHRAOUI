@@ -60,7 +60,7 @@ public sealed class SupplierAccountStatementService : ISupplierAccountStatementS
             })
             .ToListAsync(cancellationToken);
 
-        var entries = new List<(DateTime Date, ClientAccountEntryKind Kind, long TieBreakId, string Designation, string Observation, decimal Debit, decimal Credit)>();
+        var entries = new List<(DateTime Date, ClientAccountEntryKind Kind, long TieBreakId, ClientAccountEntryKind NavigationKind, int NavigationId, string Designation, string Observation, decimal Debit, decimal Credit)>();
 
         foreach (var f in factures)
         {
@@ -69,6 +69,8 @@ public sealed class SupplierAccountStatementService : ISupplierAccountStatementS
 
             entries.Add((
                 f.Date.Date,
+                ClientAccountEntryKind.Facture,
+                f.Id,
                 ClientAccountEntryKind.Facture,
                 f.Id,
                 _locale.Tf("SupplierLedger_FactureFmt", f.Numero),
@@ -94,6 +96,8 @@ public sealed class SupplierAccountStatementService : ISupplierAccountStatementS
                 a.Date.Date,
                 ClientAccountEntryKind.Avoir,
                 a.Id,
+                ClientAccountEntryKind.Avoir,
+                a.Id,
                 _locale.Tf("SupplierLedger_AvoirFmt", a.Numero),
                 observation,
                 0,
@@ -110,6 +114,8 @@ public sealed class SupplierAccountStatementService : ISupplierAccountStatementS
                     p.Date.Date,
                     ClientAccountEntryKind.Paiement,
                     p.Id,
+                    ClientAccountEntryKind.Facture,
+                    f.Id,
                     PaymentDesignation(p.Mode),
                     observation,
                     0,
@@ -133,6 +139,8 @@ public sealed class SupplierAccountStatementService : ISupplierAccountStatementS
                 Date = e.Date,
                 Kind = e.Kind,
                 TieBreakId = e.TieBreakId,
+                NavigationKind = e.NavigationKind,
+                NavigationId = e.NavigationId,
                 Designation = e.Designation,
                 Observation = e.Observation,
                 Debit = e.Debit,

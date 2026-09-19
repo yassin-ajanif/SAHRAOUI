@@ -58,7 +58,7 @@ public sealed class ClientAccountStatementService : IClientAccountStatementServi
             })
             .ToListAsync(cancellationToken);
 
-        var entries = new List<(DateTime Date, ClientAccountEntryKind Kind, long TieBreakId, string Designation, string Observation, decimal Debit, decimal Credit)>();
+        var entries = new List<(DateTime Date, ClientAccountEntryKind Kind, long TieBreakId, ClientAccountEntryKind NavigationKind, int NavigationId, string Designation, string Observation, decimal Debit, decimal Credit)>();
 
         foreach (var f in factures)
         {
@@ -67,6 +67,8 @@ public sealed class ClientAccountStatementService : IClientAccountStatementServi
 
             entries.Add((
                 f.Date.Date,
+                ClientAccountEntryKind.Facture,
+                f.Id,
                 ClientAccountEntryKind.Facture,
                 f.Id,
                 _locale.Tf("ClientLedger_FactureFmt", f.Numero),
@@ -103,6 +105,8 @@ public sealed class ClientAccountStatementService : IClientAccountStatementServi
                 b.Date.Date,
                 ClientAccountEntryKind.BonPreparation,
                 b.Id,
+                ClientAccountEntryKind.BonPreparation,
+                b.Id,
                 _locale.Tf("ClientLedger_BonPreparationFmt", b.Numero),
                 string.Empty,
                 ttc,
@@ -126,6 +130,8 @@ public sealed class ClientAccountStatementService : IClientAccountStatementServi
                 a.Date.Date,
                 ClientAccountEntryKind.Avoir,
                 a.Id,
+                ClientAccountEntryKind.Avoir,
+                a.Id,
                 _locale.Tf("ClientLedger_AvoirFmt", a.Numero),
                 observation,
                 0,
@@ -142,6 +148,8 @@ public sealed class ClientAccountStatementService : IClientAccountStatementServi
                     p.Date.Date,
                     ClientAccountEntryKind.Paiement,
                     p.Id,
+                    ClientAccountEntryKind.Facture,
+                    f.Id,
                     PaymentDesignation(p.Mode),
                     observation,
                     0,
@@ -159,6 +167,8 @@ public sealed class ClientAccountStatementService : IClientAccountStatementServi
                     p.Date.Date,
                     ClientAccountEntryKind.Paiement,
                     p.Id,
+                    ClientAccountEntryKind.BonPreparation,
+                    b.Id,
                     PaymentDesignation(p.Mode),
                     observation,
                     0,
@@ -182,6 +192,8 @@ public sealed class ClientAccountStatementService : IClientAccountStatementServi
                 Date = e.Date,
                 Kind = e.Kind,
                 TieBreakId = e.TieBreakId,
+                NavigationKind = e.NavigationKind,
+                NavigationId = e.NavigationId,
                 Designation = e.Designation,
                 Observation = e.Observation,
                 Debit = e.Debit,

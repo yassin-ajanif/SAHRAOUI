@@ -2,9 +2,13 @@ using System.Collections.ObjectModel;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GestionCommerciale.Modules.AvoirFournisseur.ViewModels;
 using GestionCommerciale.Modules.Facturation.Models;
 using GestionCommerciale.Modules.Facturation.Services;
+using GestionCommerciale.Modules.Facturation.ViewModels;
 using GestionCommerciale.Modules.FactureFournisseur.Services;
+using GestionCommerciale.Modules.FactureFournisseur.ViewModels;
+using GestionCommerciale.Modules.Preparation.ViewModels;
 using GestionCommerciale.Modules.Reception.Services;
 using GestionCommerciale.Modules.Tiers.Models;
 using GestionCommerciale.Shared.Database;
@@ -25,6 +29,9 @@ public sealed class ClientLedgerDisplayRow
     public string DebitText { get; init; } = string.Empty;
     public string CreditText { get; init; } = string.Empty;
     public string BalanceText { get; init; } = string.Empty;
+    public ClientAccountEntryKind NavigationKind { get; init; }
+    public int NavigationId { get; init; }
+    public bool IsNavigable => NavigationId > 0;
 }
 
 public partial class TiersDetailViewModel : BaseViewModel
@@ -342,7 +349,9 @@ public partial class TiersDetailViewModel : BaseViewModel
                 Observation = row.Observation,
                 DebitText = row.Debit > 0 ? FormatAmount(row.Debit) : string.Empty,
                 CreditText = row.Credit > 0 ? FormatAmount(row.Credit) : string.Empty,
-                BalanceText = FormatAmount(row.Balance)
+                BalanceText = FormatAmount(row.Balance),
+                NavigationKind = row.NavigationKind,
+                NavigationId = row.NavigationId
             });
         }
 
@@ -351,6 +360,60 @@ public partial class TiersDetailViewModel : BaseViewModel
     }
 
     private string FormatAmount(decimal amount) => CurrencyHelper.Format(amount, _devise);
+
+    [RelayCommand]
+    private void OpenLedgerDocument(ClientLedgerDisplayRow? row)
+    {
+        if (row is not { IsNavigable: true, NavigationId: var id }) return;
+
+        if (_returnScope == TiersListScope.Fournisseurs)
+        {
+            switch (row.NavigationKind)
+            {
+                case ClientAccountEntryKind.Facture:
+                {
+                    var vm = _sp.GetRequiredService<FactureFournisseurEditViewModel>();
+                    vm.Load(id);
+                    _workspace.Open(vm);
+                    break;
+                }
+                case ClientAccountEntryKind.Avoir:
+                {
+                    var vm = _sp.GetRequiredService<AvoirFournisseurEditViewModel>();
+                    vm.Load(id);
+                    _workspace.Open(vm);
+                    break;
+                }
+            }
+
+            return;
+        }
+
+        switch (row.NavigationKind)
+        {
+            case ClientAccountEntryKind.Facture:
+            {
+                var vm = _sp.GetRequiredService<FactureEditViewModel>();
+                vm.Load(id);
+                _workspace.Open(vm);
+                break;
+            }
+            case ClientAccountEntryKind.BonPreparation:
+            {
+                var vm = _sp.GetRequiredService<BonPreparationEditViewModel>();
+                vm.Load(id);
+                _workspace.Open(vm);
+                break;
+            }
+            case ClientAccountEntryKind.Avoir:
+            {
+                var vm = _sp.GetRequiredService<AvoirEditViewModel>();
+                vm.Load(id);
+                _workspace.Open(vm);
+                break;
+            }
+        }
+    }
 
     [RelayCommand]
     private async Task OpenWhatsAppAsync(CancellationToken cancellationToken)
