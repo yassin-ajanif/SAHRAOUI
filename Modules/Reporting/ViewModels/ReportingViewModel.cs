@@ -98,7 +98,13 @@ public partial class ReportingViewModel : BaseViewModel
     }
 
     [RelayCommand]
-    private async Task LoadAsync(CancellationToken cancellationToken)
+    private Task LoadAsync(CancellationToken cancellationToken) =>
+        LoadCoreAsync(forceRefresh: false, cancellationToken);
+
+    public Task RefreshAsync(CancellationToken cancellationToken = default) =>
+        LoadCoreAsync(forceRefresh: true, cancellationToken);
+
+    private async Task LoadCoreAsync(bool forceRefresh, CancellationToken cancellationToken)
     {
         if (!_session.CanAccessReporting)
         {
@@ -106,7 +112,7 @@ public partial class ReportingViewModel : BaseViewModel
             return;
         }
 
-        if (_cachedData is not null)
+        if (!forceRefresh && _cachedData is not null)
         {
             ApplyData(_cachedData);
             return;

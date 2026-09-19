@@ -21,8 +21,8 @@ public partial class HomeView : UserControl
     private void RefreshDashboardIfAttached()
     {
         if (VisualRoot is null) return;
-        if (DataContext is HomeViewModel { Dashboard: { } dashboard })
-            dashboard.LoadCommand.Execute(null);
+        if (DataContext is HomeViewModel home)
+            _ = home.RefreshAsync();
     }
 
     private void InitializeComponent() => AvaloniaXamlLoader.Load(this);

@@ -81,4 +81,11 @@ public class HomeViewModel : BaseViewModel
         OnPropertyChanged(nameof(TrialMessage));
         OnPropertyChanged(nameof(ShowTrialMessage));
     }
+
+    public async Task RefreshAsync(CancellationToken cancellationToken = default)
+    {
+        await RefreshTrialMessageAsync();
+        if (Dashboard is not null)
+            await Dashboard.RefreshAsync(cancellationToken);
+    }
 }

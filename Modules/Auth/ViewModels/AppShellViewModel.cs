@@ -171,7 +171,12 @@ public partial class AppShellViewModel : BaseViewModel
     public bool ShowNavSettings => _session.CanAccessSettings;
 
     [RelayCommand]
-    private void GoHome() => _workspace.Open(_sp.GetRequiredService<HomeViewModel>());
+    private void GoHome()
+    {
+        var home = _sp.GetRequiredService<HomeViewModel>();
+        _workspace.Open(home);
+        _ = home.RefreshAsync();
+    }
 
     [RelayCommand]
     private void GoPos() => _workspace.Open(_sp.GetRequiredService<PosViewModel>());
